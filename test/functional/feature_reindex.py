@@ -28,6 +28,7 @@ class ReindexTest(BitcoinTestFramework):
         self.log.info("Success")
 
     def run_test(self):
+        import pdb; pdb.set_trace()
         self.reindex(False)
         self.reindex(True)
         self.reindex(False)

@@ -357,6 +357,11 @@ class TestNode():
         if wait_until_stopped:
             self.wait_until_stopped()
 
+        lock_path = os.path.join(self.datadir, self.chain, ".lock")
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+            self.log.info(f"Removed {lock_path}")
+
     def is_node_stopped(self):
         """Checks whether the node has stopped.
 
