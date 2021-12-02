@@ -368,6 +368,22 @@ class TestNode():
         if return_code is None:
             return False
 
+        import fcntl
+        lock_path = os.path.join(self.datadir, self.chain, ".lock")
+        with open(lock_path, 'r') as lock_file:
+            try:
+                # If the lock is not yet released, this will throw an IOError. From what I could find 
+                # the most elegant way of checking a lock is to try and obtain the lock again.
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+                # The lock was already released, so make sure to unlock it again
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                self.log.info(f"{lock_path} is unlocked")
+            except IOError as e:
+                self.log.info(f"{lock_path} is still locked")
+                self.log.info(e)
+                return False
+
         # process has stopped. Assert that it didn't return an error code.
         assert return_code == 0, self._node_msg(
             "Node returned non-zero exit code (%d) when stopping" % return_code)
