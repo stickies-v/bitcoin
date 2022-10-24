@@ -19,6 +19,7 @@
 #include <rpc/util.h>
 #include <txmempool.h>
 #include <univalue.h>
+#include <util/check.h>
 #include <util/moneystr.h>
 #include <util/time.h>
 
@@ -448,7 +449,12 @@ static RPCHelpMan getmempoolancestors()
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
     }
 
-    auto ancestors_result{mempool.CalculateMemPoolAncestors(*it, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false)};
+    auto ancestors_result{Assume(mempool.CalculateMemPoolAncestors(*it, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false))};
+    if (!ancestors_result) {
+        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
+                      "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
+                      __func__, util::ErrorString(ancestors_result).original);
+    }
     auto ancestors{ancestors_result.value_or(CTxMemPool::setEntries{})};
 
     if (!fVerbose) {

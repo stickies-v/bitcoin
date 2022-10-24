@@ -19,6 +19,7 @@
 #include <pow.h>
 #include <primitives/transaction.h>
 #include <timedata.h>
+#include <util/check.h>
 #include <util/moneystr.h>
 #include <util/system.h>
 #include <validation.h>
@@ -394,7 +395,12 @@ void BlockAssembler::addPackageTxs(const CTxMemPool& mempool, int& nPackagesSele
             continue;
         }
 
-        auto ancestors_result{mempool.CalculateMemPoolAncestors(*iter, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false)};
+        auto ancestors_result{Assume(mempool.CalculateMemPoolAncestors(*iter, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false))};
+        if (!ancestors_result) {
+        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
+                      "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
+                      __func__, util::ErrorString(ancestors_result).original);
+        }
         auto ancestors{ancestors_result.value_or(CTxMemPool::setEntries{})};
 
         onlyUnconfirmed(ancestors);
