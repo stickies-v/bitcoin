@@ -25,6 +25,8 @@
 
 #include <cmath>
 #include <optional>
+#include <string_view>
+#include <utility>
 
 bool TestLockPointValidity(CChain& active_chain, const LockPoints& lp)
 {
@@ -286,6 +288,17 @@ util::Result<CTxMemPool::setEntries> CTxMemPool::CalculateMemPoolAncestors(
 
     return CalculateAncestorsAndCheckLimits(entry.GetTxSize(), /*entry_count=*/1, staged_ancestors,
                                             limits);
+}
+
+template<typename... Args>
+CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(std::string_view calling_fn_name, Args&&... args) const
+{
+    auto result{Assume(CalculateMemPoolAncestors(std::forward<Args>(args)...))};
+    if (!result) {
+        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error, "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)\n",
+                      calling_fn_name, util::ErrorString(result).original);
+    }
+    return result.value_or(CTxMemPool::setEntries{});
 }
 
 void CTxMemPool::UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
