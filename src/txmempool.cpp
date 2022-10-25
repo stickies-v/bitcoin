@@ -288,6 +288,18 @@ util::Result<CTxMemPool::setEntries> CTxMemPool::CalculateMemPoolAncestors(
                                             limits);
 }
 
+template<typename... Args>
+CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(Args&&... args, std::string_view calling_fn_name) const
+{
+    auto result{Assume(CalculateMemPoolAncestors(std::forward<Args>(args)...))};
+    if (!result) {
+        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
+                        "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
+                        calling_fn_name, util::ErrorString(result).original);
+    }
+    return result.value_or(CTxMemPool::setEntries{});
+}
+
 void CTxMemPool::UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
 {
     const CTxMemPoolEntry::Parents& parents = it->GetMemPoolParentsConst();
