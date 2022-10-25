@@ -18,6 +18,7 @@
 #include <limits>
 #include <vector>
 
+
 RBFTransactionState IsRBFOptIn(const CTransaction& tx, const CTxMemPool& pool)
 {
     AssertLockHeld(pool.cs);
@@ -35,14 +36,9 @@ RBFTransactionState IsRBFOptIn(const CTransaction& tx, const CTxMemPool& pool)
 
     // If all the inputs have nSequence >= maxint-1, it still might be
     // signaled for RBF if any unconfirmed parents have signaled.
-    CTxMemPoolEntry entry = *pool.mapTx.find(tx.GetHash());
-    auto ancestors_result{Assume(pool.CalculateMemPoolAncestors(entry, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false))};
-    if (!ancestors_result) {
-        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
-                      "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
-                      __func__, util::ErrorString(ancestors_result).original);
-    }
-    auto ancestors{ancestors_result.value_or(CTxMemPool::setEntries{})};
+    auto entry = *pool.mapTx.find(tx.GetHash());
+    // auto ancestors{*pool.CalculateMemPoolAncestors(entry, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false)};
+    auto ancestors{pool.AssumeCalculateMemPoolAncestors(__func__, entry, CTxMemPool::Limits::NoLimits(), /*fSearchForParents=*/false)};
 
     for (CTxMemPool::txiter it : ancestors) {
         if (SignalsOptInRBF(it->GetTx())) {

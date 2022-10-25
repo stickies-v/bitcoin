@@ -25,6 +25,8 @@
 
 #include <cmath>
 #include <optional>
+#include <string>
+#include <string_view>
 
 bool TestLockPointValidity(CChain& active_chain, const LockPoints& lp)
 {
@@ -289,7 +291,7 @@ util::Result<CTxMemPool::setEntries> CTxMemPool::CalculateMemPoolAncestors(
 }
 
 template<typename... Args>
-CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(Args&&... args, std::string_view calling_fn_name) const
+CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(std::string_view calling_fn_name, Args&&... args) const
 {
     auto result{Assume(CalculateMemPoolAncestors(std::forward<Args>(args)...))};
     if (!result) {
@@ -381,13 +383,7 @@ void CTxMemPool::UpdateForRemoveFromMempool(const setEntries &entriesToRemove, b
         // mempool parents we'd calculate by searching, and it's important that
         // we use the cached notion of ancestor transactions as the set of
         // things to update for removal.
-        auto ancestors_result{Assume(CalculateMemPoolAncestors(entry, Limits::NoLimits(), /*fSearchForParents=*/false))};
-        if (!ancestors_result) {
-            LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
-                          "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
-                          __func__, util::ErrorString(ancestors_result).original);
-        }
-        auto ancestors{ancestors_result.value_or(setEntries{})};
+        auto ancestors{AssumeCalculateMemPoolAncestors(__func__, entry, Limits::NoLimits(), /*fSearchForParents=*/false)};
         // Note that UpdateAncestorsOf severs the child links that point to
         // removeIt in the entries for the parents of removeIt.
         UpdateAncestorsOf(false, removeIt, ancestors);
@@ -740,13 +736,7 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
         assert(setParentCheck.size() == it->GetMemPoolParentsConst().size());
         assert(std::equal(setParentCheck.begin(), setParentCheck.end(), it->GetMemPoolParentsConst().begin(), comp));
         // Verify ancestor state is correct.
-        auto ancestors_result{Assume(CalculateMemPoolAncestors(*it, Limits::NoLimits()))};
-        if (!ancestors_result) {
-        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
-                      "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
-                      __func__, util::ErrorString(ancestors_result).original);
-        }
-        auto ancestors{ancestors_result.value_or(setEntries{})};
+        auto ancestors{AssumeCalculateMemPoolAncestors(__func__, *it, Limits::NoLimits())};
         uint64_t nCountCheck = ancestors.size() + 1;
         uint64_t nSizeCheck = it->GetTxSize();
         CAmount nFeesCheck = it->GetModifiedFee();
@@ -907,13 +897,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256& hash, const CAmount& nFeeD
         if (it != mapTx.end()) {
             mapTx.modify(it, [&nFeeDelta](CTxMemPoolEntry& e) { e.UpdateModifiedFee(nFeeDelta); });
             // Now update all ancestors' modified fees with descendants
-            auto ancestors_result{Assume(CalculateMemPoolAncestors(*it, Limits::NoLimits(), /*fSearchForParents=*/false))};
-            if (!ancestors_result) {
-            LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
-                          "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
-                          __func__, util::ErrorString(ancestors_result).original);
-            }
-            auto ancestors{ancestors_result.value_or(setEntries{})};
+            auto ancestors{AssumeCalculateMemPoolAncestors(__func__, *it, Limits::NoLimits(), /*fSearchForParents=*/false)};
             for (txiter ancestorIt : ancestors) {
                 mapTx.modify(ancestorIt, [=](CTxMemPoolEntry& e){ e.UpdateDescendantState(0, nFeeDelta, 0);});
             }
@@ -1051,13 +1035,7 @@ int CTxMemPool::Expire(std::chrono::seconds time)
 
 void CTxMemPool::addUnchecked(const CTxMemPoolEntry &entry, bool validFeeEstimate)
 {
-    auto ancestors_result{Assume(CalculateMemPoolAncestors(entry, Limits::NoLimits()))};
-    if (!ancestors_result) {
-    LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error,
-                  "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
-                  __func__, util::ErrorString(ancestors_result).original);
-    }
-    auto ancestors{ancestors_result.value_or(CTxMemPool::setEntries{})};
+    auto ancestors{AssumeCalculateMemPoolAncestors(__func__, entry, Limits::NoLimits())};
     return addUnchecked(entry, ancestors, validFeeEstimate);
 }
 
