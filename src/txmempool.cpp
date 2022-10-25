@@ -266,6 +266,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
                                            std::string &errString,
                                            bool fSearchForParents /* = true */) const
 {
+    setAncestors.clear();
     CTxMemPoolEntry::Parents staged_ancestors;
     const CTransaction &tx = entry.GetTx();
 
