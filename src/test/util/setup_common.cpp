@@ -36,6 +36,7 @@
 #include <shutdown.h>
 #include <streams.h>
 #include <test/util/net.h>
+#include <test/util/txmempool.h>
 #include <timedata.h>
 #include <txdb.h>
 #include <txmempool.h>
@@ -60,7 +61,6 @@ using node::ApplyArgsManOptions;
 using node::BlockAssembler;
 using node::CalculateCacheSizes;
 using node::LoadChainstate;
-using node::NodeContext;
 using node::RegenerateCommitments;
 using node::VerifyLoadedChainstate;
 
@@ -146,7 +146,6 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::ve
     Assert(InitScriptExecutionCache(validation_cache_sizes.script_execution_cache_bytes));
 
     m_node.chain = interfaces::MakeChain(m_node);
-    fCheckBlockIndex = true;
     static bool noui_connected = false;
     if (!noui_connected) {
         noui_connect();
@@ -160,19 +159,6 @@ BasicTestingSetup::~BasicTestingSetup()
     LogInstance().DisconnectTestLogger();
     fs::remove_all(m_path_root);
     gArgs.ClearArgs();
-}
-
-CTxMemPool::Options MemPoolOptionsForTest(const NodeContext& node)
-{
-    CTxMemPool::Options mempool_opts{
-        .estimator = node.fee_estimator.get(),
-        // Default to always checking mempool regardless of
-        // chainparams.DefaultConsistencyChecks for tests
-        .check_ratio = 1,
-    };
-    const auto err{ApplyArgsManOptions(*node.args, ::Params(), mempool_opts)};
-    Assert(!err);
-    return mempool_opts;
 }
 
 ChainTestingSetup::ChainTestingSetup(const std::string& chainName, const std::vector<const char*>& extra_args)
@@ -194,14 +180,13 @@ ChainTestingSetup::ChainTestingSetup(const std::string& chainName, const std::ve
     const ChainstateManager::Options chainman_opts{
         .chainparams = chainparams,
         .adjusted_time_callback = GetAdjustedTime,
+        .check_block_index = true,
     };
     m_node.chainman = std::make_unique<ChainstateManager>(chainman_opts);
     m_node.chainman->m_blockman.m_block_tree_db = std::make_unique<CBlockTreeDB>(m_cache_sizes.block_tree_db, true);
 
-    // Start script-checking threads. Set g_parallel_script_checks to true so they are used.
     constexpr int script_check_threads = 2;
     StartScriptCheckWorkerThreads(script_check_threads);
-    g_parallel_script_checks = true;
 }
 
 ChainTestingSetup::~ChainTestingSetup()
@@ -436,17 +421,6 @@ std::vector<CTransactionRef> TestChain100Setup::PopulateMempool(FastRandomContex
         --num_transactions;
     }
     return mempool_transactions;
-}
-
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction& tx) const
-{
-    return FromTx(MakeTransactionRef(tx));
-}
-
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransactionRef& tx) const
-{
-    return CTxMemPoolEntry(tx, nFee, nTime, nHeight,
-                           spendsCoinbase, sigOpCost, lp);
 }
 
 /**
