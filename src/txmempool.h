@@ -699,8 +699,11 @@ public:
      *
      * @see CTXMemPool::CalculateMemPoolAncestors()
      */
-    template<typename... Args>
-    setEntries AssumeCalculateMemPoolAncestors(std::string_view calling_fn_name, Args&&... args) const EXCLUSIVE_LOCKS_REQUIRED(cs);
+    setEntries AssumeCalculateMemPoolAncestors(
+        std::string_view calling_fn_name,
+        const CTxMemPoolEntry &entry,
+        const Limits& limits,
+        bool fSearchForParents = true) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
     /** Calculate all in-mempool ancestors of a set of transactions not already in the mempool and
      * check ancestor and descendant limits. Heuristics are used to estimate the ancestor and
