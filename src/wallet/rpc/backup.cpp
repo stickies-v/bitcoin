@@ -287,9 +287,8 @@ RPCHelpMan importaddress()
             pwallet->MarkDirty();
 
             pwallet->ImportScriptPubKeys(strLabel, {GetScriptForDestination(dest)}, /*have_solving_data=*/false, /*apply_label=*/true, /*timestamp=*/1);
-        } else if (IsHex(request.params[0].get_str())) {
-            std::vector<unsigned char> data(ParseHex(request.params[0].get_str()));
-            CScript redeem_script(data.begin(), data.end());
+        } else if (auto data{TryParseHex<unsigned char>(request.params[0].get_str())}) {
+            CScript redeem_script(data->begin(), data->end());
 
             std::set<CScript> scripts = {redeem_script};
             pwallet->ImportScripts(scripts, /*timestamp=*/0);
@@ -458,10 +457,9 @@ RPCHelpMan importpubkey()
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is currently rescanning. Abort existing rescan or wait.");
     }
 
-    if (!IsHex(request.params[0].get_str()))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey must be a hex string");
-    std::vector<unsigned char> data(ParseHex(request.params[0].get_str()));
-    CPubKey pubKey(data);
+    auto data{TryParseHex<unsigned char>(request.params[0].get_str())};
+    if (!data) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey must be a hex string");
+    CPubKey pubKey(*data);
     if (!pubKey.IsFullyValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey is not a valid public key");
 
@@ -571,9 +569,8 @@ RPCHelpMan importwallet()
                 }
                 nTimeBegin = std::min(nTimeBegin, nTime);
                 keys.push_back(std::make_tuple(key, nTime, fLabel, strLabel));
-            } else if(IsHex(vstr[0])) {
-                std::vector<unsigned char> vData(ParseHex(vstr[0]));
-                CScript script = CScript(vData.begin(), vData.end());
+            } else if(auto data{TryParseHex<unsigned char>(vstr[0])}) {
+                CScript script = CScript(data->begin(), data->end());
                 int64_t birth_time = ParseISO8601DateTime(vstr[1]);
                 if (birth_time > 0) nTimeBegin = std::min(nTimeBegin, birth_time);
                 scripts.push_back(std::pair<CScript, int64_t>(script, birth_time));
@@ -952,11 +949,9 @@ static UniValue ProcessImportLegacy(ImportData& import_data, std::map<CKeyID, CP
         }
         script = GetScriptForDestination(dest);
     } else {
-        if (!IsHex(output)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid scriptPubKey \"" + output + "\"");
-        }
-        std::vector<unsigned char> vData(ParseHex(output));
-        script = CScript(vData.begin(), vData.end());
+        auto data{TryParseHex<unsigned char>(output)};
+        if (!data) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid scriptPubKey \"" + output + "\"");
+        script = CScript(data->begin(), data->end());
         CTxDestination dest;
         if (!ExtractDestination(script, dest) && !internal) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Internal must be set to true for nonstandard scriptPubKey imports.");
@@ -966,26 +961,24 @@ static UniValue ProcessImportLegacy(ImportData& import_data, std::map<CKeyID, CP
 
     // Parse all arguments
     if (strRedeemScript.size()) {
-        if (!IsHex(strRedeemScript)) {
+        auto parsed_redeemscript{TryParseHex<uint8_t>(strRedeemScript)};
+        if (!parsed_redeemscript) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid redeem script \"" + strRedeemScript + "\": must be hex string");
         }
-        auto parsed_redeemscript = ParseHex(strRedeemScript);
-        import_data.redeemscript = std::make_unique<CScript>(parsed_redeemscript.begin(), parsed_redeemscript.end());
+        import_data.redeemscript = std::make_unique<CScript>(parsed_redeemscript->begin(), parsed_redeemscript->end());
     }
     if (witness_script_hex.size()) {
-        if (!IsHex(witness_script_hex)) {
+        auto parsed_witnessscript{TryParseHex<uint8_t>(witness_script_hex)};
+        if (!parsed_witnessscript) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid witness script \"" + witness_script_hex + "\": must be hex string");
         }
-        auto parsed_witnessscript = ParseHex(witness_script_hex);
-        import_data.witnessscript = std::make_unique<CScript>(parsed_witnessscript.begin(), parsed_witnessscript.end());
+        import_data.witnessscript = std::make_unique<CScript>(parsed_witnessscript->begin(), parsed_witnessscript->end());
     }
     for (size_t i = 0; i < pubKeys.size(); ++i) {
         const auto& str = pubKeys[i].get_str();
-        if (!IsHex(str)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey \"" + str + "\" must be a hex string");
-        }
-        auto parsed_pubkey = ParseHex(str);
-        CPubKey pubkey(parsed_pubkey);
+        auto parsed_pubkey{TryParseHex<uint8_t>(str)};
+        if (!parsed_pubkey) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey \"" + str + "\" must be a hex string");
+        CPubKey pubkey(*parsed_pubkey);
         if (!pubkey.IsFullyValid()) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey \"" + str + "\" is not a valid public key");
         }

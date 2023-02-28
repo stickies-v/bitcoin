@@ -194,20 +194,16 @@ static bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& 
 
 bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness, bool try_witness)
 {
-    if (!IsHex(hex_tx)) {
-        return false;
-    }
-
-    std::vector<unsigned char> txData(ParseHex(hex_tx));
-    return DecodeTx(tx, txData, try_no_witness, try_witness);
+    auto tx_data{TryParseHex<unsigned char>(hex_tx)};
+    if (!tx_data) return false;
+    return DecodeTx(tx, *tx_data, try_no_witness, try_witness);
 }
 
 bool DecodeHexBlockHeader(CBlockHeader& header, const std::string& hex_header)
 {
-    if (!IsHex(hex_header)) return false;
-
-    const std::vector<unsigned char> header_data{ParseHex(hex_header)};
-    DataStream ser_header{header_data};
+    auto header_data{TryParseHex<unsigned char>(hex_header)};
+    if (!header_data) return false;
+    DataStream ser_header(*header_data);
     try {
         ser_header >> header;
     } catch (const std::exception&) {
@@ -218,11 +214,9 @@ bool DecodeHexBlockHeader(CBlockHeader& header, const std::string& hex_header)
 
 bool DecodeHexBlk(CBlock& block, const std::string& strHexBlk)
 {
-    if (!IsHex(strHexBlk))
-        return false;
-
-    std::vector<unsigned char> blockData(ParseHex(strHexBlk));
-    CDataStream ssBlock(blockData, SER_NETWORK, PROTOCOL_VERSION);
+    auto block_data{TryParseHex<unsigned char>(strHexBlk)};
+    if (!block_data) return false;
+    CDataStream ssBlock(*block_data, SER_NETWORK, PROTOCOL_VERSION);
     try {
         ssBlock >> block;
     }
@@ -247,9 +241,9 @@ std::vector<unsigned char> ParseHexUV(const UniValue& v, const std::string& strN
     std::string strHex;
     if (v.isStr())
         strHex = v.getValStr();
-    if (!IsHex(strHex))
-        throw std::runtime_error(strName + " must be hexadecimal string (not '" + strHex + "')");
-    return ParseHex(strHex);
+    auto hex{TryParseHex<unsigned char>(strHex)};
+    if (!hex) throw std::runtime_error(strName + " must be hexadecimal string (not '" + strHex + "')");
+    return *hex;
 }
 
 int ParseSighashString(const UniValue& sighash)

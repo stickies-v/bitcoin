@@ -443,12 +443,10 @@ static void MutateTxAddOutData(CMutableTransaction& tx, const std::string& strIn
     // extract and validate DATA
     const std::string strData{strInput.substr(pos, std::string::npos)};
 
-    if (!IsHex(strData))
-        throw std::runtime_error("invalid TX output data");
+    auto data{TryParseHex<unsigned char>(strData)};
+    if (!data) throw std::runtime_error("invalid TX output data");
 
-    std::vector<unsigned char> data = ParseHex(strData);
-
-    CTxOut txout(value, CScript() << OP_RETURN << data);
+    CTxOut txout(value, CScript() << OP_RETURN << *data);
     tx.vout.push_back(txout);
 }
 

@@ -242,22 +242,21 @@ bool CreateFromDump(const ArgsManager& args, const std::string& name, const fs::
                 continue;
             }
 
-            if (!IsHex(key)) {
+            auto k{TryParseHex<unsigned char>(key)};
+            if (!k) {
                 error = strprintf(_("Error: Got key that was not hex: %s"), key);
                 ret = false;
                 break;
             }
-            if (!IsHex(value)) {
+            auto v{TryParseHex<unsigned char>(value)};
+            if (!v) {
                 error = strprintf(_("Error: Got value that was not hex: %s"), value);
                 ret = false;
                 break;
             }
 
-            std::vector<unsigned char> k = ParseHex(key);
-            std::vector<unsigned char> v = ParseHex(value);
-
-            DataStream ss_key{k};
-            DataStream ss_value{v};
+            DataStream ss_key(k.value());
+            DataStream ss_value(v.value());
 
             if (!batch->Write(ss_key, ss_value)) {
                 error = strprintf(_("Error: Unable to write record to new wallet"));

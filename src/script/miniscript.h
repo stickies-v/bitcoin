@@ -1338,10 +1338,10 @@ std::optional<std::pair<std::vector<unsigned char>, int>> ParseHexStrEnd(Span<co
     int hash_size = FindNextChar(in, ')');
     if (hash_size < 1) return {};
     std::string val = std::string(in.begin(), in.begin() + hash_size);
-    if (!IsHex(val)) return {};
-    auto hash = ParseHex(val);
-    if (hash.size() != expected_size) return {};
-    return {{std::move(hash), hash_size}};
+    auto hash{TryParseHex<unsigned char>(val)};
+    if (!hash) return {};
+    if (hash->size() != expected_size) return {};
+    return {{std::move(*hash), hash_size}};
 }
 
 /** BuildBack pops the last two elements off `constructed` and wraps them in the specified Fragment */

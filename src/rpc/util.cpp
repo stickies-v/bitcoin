@@ -88,9 +88,9 @@ std::vector<unsigned char> ParseHexV(const UniValue& v, std::string strName)
     std::string strHex;
     if (v.isStr())
         strHex = v.get_str();
-    if (!IsHex(strHex))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strName+" must be hexadecimal string (not '"+strHex+"')");
-    return ParseHex(strHex);
+    auto hex{TryParseHex<unsigned char>(strHex)};
+    if (!hex) throw JSONRPCError(RPC_INVALID_PARAMETER, strName+" must be hexadecimal string (not '"+strHex+"')");
+    return *hex;
 }
 std::vector<unsigned char> ParseHexO(const UniValue& o, std::string strKey)
 {
@@ -174,10 +174,9 @@ std::string HelpExampleRpcNamed(const std::string& methodname, const RPCArgList&
 // Converts a hex string to a public key if possible
 CPubKey HexToPubKey(const std::string& hex_in)
 {
-    if (!IsHex(hex_in)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid public key: " + hex_in);
-    }
-    CPubKey vchPubKey(ParseHex(hex_in));
+    auto hex{TryParseHex<uint8_t>(hex_in)};
+    if (!hex) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid public key: " + hex_in);
+    CPubKey vchPubKey(*hex);
     if (!vchPubKey.IsFullyValid()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid public key: " + hex_in);
     }

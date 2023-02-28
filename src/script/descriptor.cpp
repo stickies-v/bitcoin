@@ -1084,9 +1084,9 @@ std::unique_ptr<PubkeyProvider> ParsePubkeyInner(uint32_t key_exp_index, const S
         return nullptr;
     }
     if (split.size() == 1) {
-        if (IsHex(str)) {
-            std::vector<unsigned char> data = ParseHex(str);
-            CPubKey pubkey(data);
+        auto data{TryParseHex<unsigned char>(str)};
+        if (data) {
+            CPubKey pubkey(*data);
             if (pubkey.IsFullyValid()) {
                 if (permit_uncompressed || pubkey.IsCompressed()) {
                     return std::make_unique<ConstPubkeyProvider>(key_exp_index, pubkey, false);
@@ -1094,9 +1094,9 @@ std::unique_ptr<PubkeyProvider> ParsePubkeyInner(uint32_t key_exp_index, const S
                     error = "Uncompressed keys are not allowed";
                     return nullptr;
                 }
-            } else if (data.size() == 32 && ctx == ParseScriptContext::P2TR) {
+            } else if (data.value().size() == 32 && ctx == ParseScriptContext::P2TR) {
                 unsigned char fullkey[33] = {0x02};
-                std::copy(data.begin(), data.end(), fullkey + 1);
+                std::copy(data.value().begin(), data.value().end(), fullkey + 1);
                 pubkey.Set(std::begin(fullkey), std::end(fullkey));
                 if (pubkey.IsFullyValid()) {
                     return std::make_unique<ConstPubkeyProvider>(key_exp_index, pubkey, true);
@@ -1162,15 +1162,15 @@ std::unique_ptr<PubkeyProvider> ParsePubkey(uint32_t key_exp_index, const Span<c
         return nullptr;
     }
     std::string fpr_hex = std::string(slash_split[0].begin(), slash_split[0].end());
-    if (!IsHex(fpr_hex)) {
+    auto fpr_bytes{TryParseHex<uint8_t>(fpr_hex)};
+    if (!fpr_bytes) {
         error = strprintf("Fingerprint '%s' is not hex", fpr_hex);
         return nullptr;
     }
-    auto fpr_bytes = ParseHex(fpr_hex);
     KeyOriginInfo info;
     static_assert(sizeof(info.fingerprint) == 4, "Fingerprint must be 4 bytes");
-    assert(fpr_bytes.size() == 4);
-    std::copy(fpr_bytes.begin(), fpr_bytes.end(), info.fingerprint);
+    assert(fpr_bytes.value().size() == 4);
+    std::copy(fpr_bytes.value().begin(), fpr_bytes.value().end(), info.fingerprint);
     if (!ParseKeyPath(slash_split, info.path, error)) return nullptr;
     auto provider = ParsePubkeyInner(key_exp_index, origin_split[1], ctx, out, error);
     if (!provider) return nullptr;
@@ -1490,12 +1490,12 @@ std::unique_ptr<DescriptorImpl> ParseScript(uint32_t& key_exp_index, Span<const 
     }
     if (ctx == ParseScriptContext::TOP && Func("raw", expr)) {
         std::string str(expr.begin(), expr.end());
-        if (!IsHex(str)) {
+        auto bytes{TryParseHex<uint8_t>(str)};
+        if (!bytes) {
             error = "Raw script is not hex";
             return nullptr;
         }
-        auto bytes = ParseHex(str);
-        return std::make_unique<RawDescriptor>(CScript(bytes.begin(), bytes.end()));
+        return std::make_unique<RawDescriptor>(CScript(bytes->begin(), bytes->end()));
     } else if (Func("raw", expr)) {
         error = "Can only have raw() at top level";
         return nullptr;

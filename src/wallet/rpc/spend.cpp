@@ -626,11 +626,9 @@ void FundTransaction(CWallet& wallet, CMutableTransaction& tx, CAmount& fee_out,
         if (solving_data.exists("pubkeys")) {
             for (const UniValue& pk_univ : solving_data["pubkeys"].get_array().getValues()) {
                 const std::string& pk_str = pk_univ.get_str();
-                if (!IsHex(pk_str)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("'%s' is not hex", pk_str));
-                }
-                const std::vector<unsigned char> data(ParseHex(pk_str));
-                const CPubKey pubkey(data.begin(), data.end());
+                auto data(TryParseHex<unsigned char>(pk_str));
+                if (!data) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("'%s' is not hex", pk_str));
+                const CPubKey pubkey(data->begin(), data->end());
                 if (!pubkey.IsFullyValid()) {
                     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("'%s' is not a valid public key", pk_str));
                 }
@@ -644,11 +642,9 @@ void FundTransaction(CWallet& wallet, CMutableTransaction& tx, CAmount& fee_out,
         if (solving_data.exists("scripts")) {
             for (const UniValue& script_univ : solving_data["scripts"].get_array().getValues()) {
                 const std::string& script_str = script_univ.get_str();
-                if (!IsHex(script_str)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("'%s' is not hex", script_str));
-                }
-                std::vector<unsigned char> script_data(ParseHex(script_str));
-                const CScript script(script_data.begin(), script_data.end());
+                auto script_data{TryParseHex<unsigned char>(script_str)};
+                if (!script_data) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("'%s' is not hex", script_str));
+                const CScript script(script_data->begin(), script_data->end());
                 coinControl.m_external_provider.scripts.emplace(CScriptID(script), script);
             }
         }
