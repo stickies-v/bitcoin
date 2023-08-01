@@ -18,6 +18,7 @@
 #include <key_io.h>
 #include <policy/policy.h>
 #include <primitives/transaction.h>
+#include <rpc/util.h>
 #include <script/script.h>
 #include <script/sign.h>
 #include <script/signingprovider.h>
@@ -550,18 +551,6 @@ static bool findSighashFlags(int& flags, const std::string& flagStr)
     return false;
 }
 
-static CAmount AmountFromValue(const UniValue& value)
-{
-    if (!value.isNum() && !value.isStr())
-        throw std::runtime_error("Amount is not a number or string");
-    CAmount amount;
-    if (!ParseFixedPoint(value.getValStr(), 8, &amount))
-        throw std::runtime_error("Invalid amount");
-    if (!MoneyRange(amount))
-        throw std::runtime_error("Amount out of range");
-    return amount;
-}
-
 static std::vector<unsigned char> ParseHexUV(const UniValue& v, const std::string& strName)
 {
     std::string strHex;
@@ -645,7 +634,11 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = MAX_MONEY;
                 if (prevOut.exists("amount")) {
-                    newcoin.out.nValue = AmountFromValue(prevOut["amount"]);
+                    try {
+                        newcoin.out.nValue = AmountFromValue(prevOut["amount"]);
+                    } catch (const UniValue& error) {
+                        throw std::runtime_error(error.find_value("message").get_str());
+                    }
                 }
                 newcoin.nHeight = 1;
                 view.AddCoin(out, std::move(newcoin), true);
