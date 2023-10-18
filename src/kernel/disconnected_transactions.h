@@ -38,8 +38,7 @@ static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE = 20'000;
  */
 class DisconnectedBlockTransactions {
 private:
-    /** Cached dynamic memory usage for the CTransactions (memory for the shared pointers is
-     * included in the container calculations). */
+    /** Cached dynamic memory usage for the `CTransactionRef`s */
     uint64_t cachedInnerUsage = 0;
     const size_t m_max_mem_usage;
     std::list<CTransactionRef> queuedTx;
@@ -53,7 +52,7 @@ private:
 
         while (!queuedTx.empty() && DynamicMemoryUsage() > m_max_mem_usage) {
             evicted.emplace_back(queuedTx.front());
-            cachedInnerUsage -= RecursiveDynamicUsage(*queuedTx.front());
+            cachedInnerUsage -= RecursiveDynamicUsage(queuedTx.front());
             iters_by_txid.erase(queuedTx.front()->GetHash());
             queuedTx.pop_front();
         }
@@ -94,7 +93,7 @@ public:
         for (auto block_it = vtx.rbegin(); block_it != vtx.rend(); ++block_it) {
             auto it = queuedTx.insert(queuedTx.end(), *block_it);
             iters_by_txid.emplace((*block_it)->GetHash(), it);
-            cachedInnerUsage += RecursiveDynamicUsage(**block_it);
+            cachedInnerUsage += RecursiveDynamicUsage(*block_it);
         }
         return LimitMemoryUsage();
     }
@@ -111,7 +110,7 @@ public:
             if (iter != iters_by_txid.end()) {
                 auto list_iter = iter->second;
                 iters_by_txid.erase(iter);
-                cachedInnerUsage -= RecursiveDynamicUsage(**list_iter);
+                cachedInnerUsage -= RecursiveDynamicUsage(*list_iter);
                 queuedTx.erase(list_iter);
             }
         }
