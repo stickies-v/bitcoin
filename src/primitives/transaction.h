@@ -311,6 +311,7 @@ public:
 private:
     /** Memory only. */
     const Txid hash;
+    const bool m_has_witness;
     const Wtxid m_witness_hash;
 
     Txid ComputeHash() const;
@@ -365,7 +366,10 @@ public:
 
     std::string ToString() const;
 
-    bool HasWitness() const
+    bool HasWitness() const { return m_has_witness; }
+
+private:
+    bool ComputeHasWitness() const
     {
         for (size_t i = 0; i < vin.size(); i++) {
             if (!vin[i].scriptWitness.IsNull()) {
