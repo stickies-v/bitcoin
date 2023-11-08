@@ -624,6 +624,7 @@ std::string ArgsManager::GetHelpMessage() const
 
     std::string usage;
     LOCK(cs_args);
+    const auto& all_cmd_opts{m_available_args.at(OptionsCategory::COMMAND_OPTIONS)};
     for (const auto& [category, category_args] : m_available_args) {
         switch(category) {
             case OptionsCategory::OPTIONS:
@@ -681,14 +682,12 @@ std::string ArgsManager::GetHelpMessage() const
                 usage += HelpMessageOpt(arg_name, arg.m_help_param, arg.m_help_text);
 
                 if (category == OptionsCategory::COMMANDS) {
-                    const auto& all_cmd_opts{m_available_args.at(OptionsCategory::COMMAND_OPTIONS)};
-                    const auto allowed_cmd_opts = m_command_args.find(arg_name);
-                    if (allowed_cmd_opts != m_command_args.end()) {
-                         for (const auto& [cmd_opt_name, cmd_opt] : all_cmd_opts) {
-                             if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
-                             if (allowed_cmd_opts->second.count(cmd_opt_name)) {
-                                 usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
-                             }
+                    const auto cmd_allowed_opts = m_command_args.find(arg_name);
+                    if (cmd_allowed_opts != m_command_args.end()) {
+                        for (const auto& cmd_opt_name : cmd_allowed_opts->second) {
+                            const auto& cmd_opt{all_cmd_opts.at(cmd_opt_name)};
+                            if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
+                            usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
                          }
                     }
                 }
