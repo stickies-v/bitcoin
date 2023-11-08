@@ -154,6 +154,8 @@ protected:
      */
     bool UseDefaultSection(const std::string& arg) const EXCLUSIVE_LOCKS_REQUIRED(cs_args);
 
+    std::vector<std::pair<std::string, Arg>> GetCommandOptions(const std::string& cmd_name) const EXCLUSIVE_LOCKS_REQUIRED(cs_args);
+
  public:
     /**
      * Get setting value.

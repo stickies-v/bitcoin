@@ -624,7 +624,6 @@ std::string ArgsManager::GetHelpMessage() const
 
     std::string usage;
     LOCK(cs_args);
-    const auto& all_cmd_opts{m_available_args.at(OptionsCategory::COMMAND_OPTIONS)};
     for (const auto& [category, category_args] : m_available_args) {
         switch(category) {
             case OptionsCategory::OPTIONS:
@@ -681,12 +680,10 @@ std::string ArgsManager::GetHelpMessage() const
             if (show_debug || !(arg.m_flags & ArgsManager::DEBUG_ONLY)) {
                 usage += HelpMessageOpt(arg_name, arg.m_help_param, arg.m_help_text);
 
-                if (category == OptionsCategory::COMMANDS && m_command_args.contains(arg_name)) {
-                    const auto& cmd_allowed_opts = m_command_args.at(arg_name);
-                    for (const auto& cmd_opt_name : cmd_allowed_opts) {
-                            const auto& cmd_opt{all_cmd_opts.at(cmd_opt_name)};
-                            if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
-                            usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
+                if (category == OptionsCategory::COMMANDS) {
+                    for (const auto& [cmd_opt_name, cmd_opt] : GetCommandOptions(arg_name)) {
+                        if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
+                        usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
                     }
                 }
             }
@@ -806,6 +803,20 @@ std::variant<ChainType, std::string> ArgsManager::GetChainArg() const
 bool ArgsManager::UseDefaultSection(const std::string& arg) const
 {
     return m_network == ChainTypeToString(ChainType::MAIN) || m_network_only_args.count(arg) == 0;
+}
+
+std::vector<std::pair<std::string, ArgsManager::Arg>> ArgsManager::GetCommandOptions(const std::string& cmd_name) const
+{
+    if (!m_command_args.contains(cmd_name)) return {};
+    std::vector<std::pair<std::string, ArgsManager::Arg>> options;
+    const auto& all_cmd_opts{m_available_args.at(OptionsCategory::COMMAND_OPTIONS)};
+
+    for (const auto& cmd_opt_name : m_command_args.at(cmd_name)) {
+            const auto& cmd_opt{all_cmd_opts.at(cmd_opt_name)};
+            options.emplace_back(cmd_opt_name, cmd_opt);
+    }
+
+    return options;
 }
 
 common::SettingsValue ArgsManager::GetSetting(const std::string& arg) const
