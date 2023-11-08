@@ -681,14 +681,12 @@ std::string ArgsManager::GetHelpMessage() const
             if (show_debug || !(arg.m_flags & ArgsManager::DEBUG_ONLY)) {
                 usage += HelpMessageOpt(arg_name, arg.m_help_param, arg.m_help_text);
 
-                if (category == OptionsCategory::COMMANDS) {
-                    const auto cmd_allowed_opts = m_command_args.find(arg_name);
-                    if (cmd_allowed_opts != m_command_args.end()) {
-                        for (const auto& cmd_opt_name : cmd_allowed_opts->second) {
+                if (category == OptionsCategory::COMMANDS && m_command_args.contains(arg_name)) {
+                    const auto& cmd_allowed_opts = m_command_args.at(arg_name);
+                    for (const auto& cmd_opt_name : cmd_allowed_opts) {
                             const auto& cmd_opt{all_cmd_opts.at(cmd_opt_name)};
                             if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
                             usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
-                         }
                     }
                 }
             }
