@@ -684,11 +684,10 @@ std::string ArgsManager::GetHelpMessage() const
                     const auto allowed_cmd_opts{m_command_args.find(arg_name)};
                     const auto all_cmd_opts{m_available_args.find(OptionsCategory::COMMAND_OPTIONS)};
                     if (all_cmd_opts != m_available_args.end() && allowed_cmd_opts != m_command_args.end()) {
-                         for (const auto& [cmd_opt_name, cmd_opt] : all_cmd_opts->second) {
-                             if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
-                             if (allowed_cmd_opts->second.count(cmd_opt_name)) {
-                                 usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
-                             }
+                        for (const auto& cmd_opt_name : allowed_cmd_opts->second) {
+                            const auto& cmd_opt{all_cmd_opts->second.at(cmd_opt_name)};
+                            if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
+                            usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
                          }
                     }
                 }
