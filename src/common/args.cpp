@@ -624,8 +624,8 @@ std::string ArgsManager::GetHelpMessage() const
 
     std::string usage;
     LOCK(cs_args);
-    for (const auto& arg_map : m_available_args) {
-        switch(arg_map.first) {
+    for (const auto& [category, category_args] : m_available_args) {
+        switch(category) {
             case OptionsCategory::OPTIONS:
                 usage += HelpMessageGroup("Options:");
                 break;
@@ -671,24 +671,23 @@ std::string ArgsManager::GetHelpMessage() const
                 break;
         }
 
-        if (arg_map.first == OptionsCategory::COMMAND_OPTIONS) continue;
+        if (category == OptionsCategory::COMMAND_OPTIONS) continue;
 
         // When we get to the hidden options, stop
-        if (arg_map.first == OptionsCategory::HIDDEN) break;
+        if (category == OptionsCategory::HIDDEN) break;
 
-        for (const auto& arg : arg_map.second) {
-            if (show_debug || !(arg.second.m_flags & ArgsManager::DEBUG_ONLY)) {
-                usage += HelpMessageOpt(arg.first, arg.second.m_help_param, arg.second.m_help_text);
+        for (const auto& [arg_name, arg] : category_args) {
+            if (show_debug || !(arg.m_flags & ArgsManager::DEBUG_ONLY)) {
+                usage += HelpMessageOpt(arg_name, arg.m_help_param, arg.m_help_text);
 
-                if (arg_map.first == OptionsCategory::COMMANDS) {
-                    const auto cmd_args = m_command_args.find(arg.first);
-                    const auto command_options = m_available_args.find(OptionsCategory::COMMAND_OPTIONS);
-                    if (command_options != m_available_args.end() && cmd_args != m_command_args.end()) {
-                         const auto& cmdopt_set = cmd_args->second;
-                         for (const auto& cmdopt : command_options->second) {
-                             if ((cmdopt.second.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
-                             if (cmdopt_set.count(cmdopt.first)) {
-                                 usage += HelpMessageOpt(cmdopt.first, cmdopt.second.m_help_param, cmdopt.second.m_help_text, true);
+                if (category == OptionsCategory::COMMANDS) {
+                    const auto allowed_cmd_opts{m_command_args.find(arg_name)};
+                    const auto all_cmd_opts{m_available_args.find(OptionsCategory::COMMAND_OPTIONS)};
+                    if (all_cmd_opts != m_available_args.end() && allowed_cmd_opts != m_command_args.end()) {
+                         for (const auto& [cmd_opt_name, cmd_opt] : all_cmd_opts->second) {
+                             if ((cmd_opt.m_flags & ArgsManager::DEBUG_ONLY) && !show_debug) continue;
+                             if (allowed_cmd_opts->second.count(cmd_opt_name)) {
+                                 usage += HelpMessageOpt(cmd_opt_name, cmd_opt.m_help_param, cmd_opt.m_help_text, true);
                              }
                          }
                     }
