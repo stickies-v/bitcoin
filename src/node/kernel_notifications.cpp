@@ -61,9 +61,7 @@ kernel::InterruptResult KernelNotifications::blockTip(SynchronizationState state
 {
     uiInterface.NotifyBlockTip(state, &index);
     if (m_stop_at_height && index.nHeight >= m_stop_at_height) {
-        if (!m_interrupt()) {
-            LogPrintf("Error: failed to send shutdown signal after reaching stop height\n");
-        }
+        m_interrupt();
         return kernel::Interrupted{};
     }
     return {};

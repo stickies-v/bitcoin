@@ -120,9 +120,7 @@ public:
     }
     void startShutdown() override
     {
-        if (!(*Assert(Assert(m_context)->shutdown))()) {
-            LogPrintf("Error: failed to send shutdown signal\n");
-        }
+        (*Assert(Assert(m_context)->shutdown))();
         // Stop RPC for clean shutdown if any of waitfor* commands is executed.
         if (args().GetBoolArg("-server", false)) {
             InterruptRPC();

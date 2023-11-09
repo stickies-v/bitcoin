@@ -180,7 +180,10 @@ static std::optional<util::SignalInterrupt> g_shutdown;
 void InitContext(NodeContext& node)
 {
     assert(!g_shutdown);
-    g_shutdown.emplace();
+    g_shutdown.emplace(
+        [](){ LogPrintLevel(BCLog::NONE, BCLog::Level::Error, "Failed to read shutdown token.\n"); },
+        [](){ LogPrintLevel(BCLog::NONE, BCLog::Level::Error, "Failed to write shutdown token.\n"); }
+    );
 
     node.args = &gArgs;
     node.shutdown = &*g_shutdown;
@@ -394,7 +397,6 @@ static void HandleSIGHUP(int)
 static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
 {
     if (!(*Assert(g_shutdown))()) {
-        LogPrintf("Error: failed to send shutdown signal on Ctrl-C\n");
         return false;
     }
     Sleep(INFINITE);
@@ -1162,9 +1164,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         constexpr uint64_t min_disk_space = 50 << 20; // 50 MB
         if (!CheckDiskSpace(args.GetBlocksDirPath(), min_disk_space)) {
             LogPrintf("Shutting down due to lack of disk space!\n");
-            if (!(*Assert(node.shutdown))()) {
-                LogPrintf("Error: failed to send shutdown signal after disk space check\n");
-            }
+            (*Assert(node.shutdown))();
         }
     }, std::chrono::minutes{5});
 
@@ -1578,9 +1578,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                     "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
                 if (fRet) {
                     fReindex = true;
-                    if (!Assert(node.shutdown)->reset()) {
-                        LogPrintf("Internal error: failed to reset shutdown signal.\n");
-                    }
+                    Assert(node.shutdown)->reset();
                 } else {
                     LogPrintf("Aborted block database rebuild. Exiting.\n");
                     return false;
@@ -1715,9 +1713,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         ImportBlocks(chainman, vImportFiles);
         if (args.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
             LogPrintf("Stopping after block import\n");
-            if (!(*Assert(node.shutdown))()) {
-                LogPrintf("Error: failed to send shutdown signal after finishing block import\n");
-            }
+            (*Assert(node.shutdown))();
             return;
         }
 
