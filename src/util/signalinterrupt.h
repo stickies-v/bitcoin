@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <functional>
 
 namespace util {
 /**
@@ -28,14 +29,21 @@ namespace util {
 class SignalInterrupt
 {
 public:
-    SignalInterrupt();
+    SignalInterrupt(
+        std::function<void()> failed_token_read_cb = nullptr,
+        std::function<void()> failed_token_write_cb = nullptr
+    );
     explicit operator bool() const;
-    [[nodiscard]] bool operator()();
-    [[nodiscard]] bool reset();
-    [[nodiscard]] bool wait();
+    bool operator()();
+    bool reset();
+    bool wait();
 
 private:
-    std::atomic<bool> m_flag;
+    std::atomic<bool> m_flag{false};
+    //! (optional) callback to be executed when interrupt TokenPipe unexpectedly cannot be read
+    std::function<void()> m_failed_token_read_cb;
+    //! (optional) callback to be executed when interrupt TokenPipe unexpectedly cannot be written
+    std::function<void()> m_failed_token_write_cb;
 
 #ifndef WIN32
     // On UNIX-like operating systems use the self-pipe trick.

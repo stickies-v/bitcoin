@@ -15,7 +15,10 @@
 
 namespace util {
 
-SignalInterrupt::SignalInterrupt() : m_flag{false}
+SignalInterrupt::SignalInterrupt(
+    std::function<void()> failed_token_read_cb,
+    std::function<void()> failed_token_write_cb
+) : m_failed_token_read_cb(failed_token_read_cb), m_failed_token_write_cb(failed_token_write_cb)
 {
 #ifndef WIN32
     std::optional<TokenPipe> pipe = TokenPipe::Make();
@@ -53,6 +56,7 @@ bool SignalInterrupt::operator()()
         // Write an arbitrary byte to the write end of the pipe.
         int res = m_pipe_w.TokenWrite('x');
         if (res != 0) {
+            if (m_failed_token_write_cb) m_failed_token_write_cb();
             return false;
         }
     }
@@ -68,6 +72,7 @@ bool SignalInterrupt::wait()
 #else
     int res = m_pipe_r.TokenRead();
     if (res != 'x') {
+        if (m_failed_token_read_cb) m_failed_token_read_cb();
         return false;
     }
 #endif
