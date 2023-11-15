@@ -15,8 +15,8 @@
 #include <vector>
 
 #include <attributes.h>
-#include <uint256.h>
 #include <common/bytevectorhash.h>
+#include <uint256.h>
 
 class CBlock;
 class CBlockUndo;

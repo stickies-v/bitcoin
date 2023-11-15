@@ -145,8 +145,17 @@ BITCOIN_CORE_H = \
   compat/compat.h \
   compat/cpuid.h \
   compat/endian.h \
+  common/asmap.h \
+  common/bip32.h \
+  common/bytevectorhash.h \
+  common/error.h \
+  common/fees.h \
+  common/message.h \
+  common/readwritefile.h \
   common/settings.h \
+  common/sock.h \
   common/system.h \
+  common/spanparsing.h \
   compressor.h \
   consensus/consensus.h \
   consensus/tx_check.h \
@@ -289,18 +298,13 @@ BITCOIN_CORE_H = \
   txrequest.h \
   undo.h \
   util/any.h \
-  common/asmap.h \
   util/batchpriority.h \
-  common/bip32.h \
   util/bitdeque.h \
-  common/bytevectorhash.h \
   util/chaintype.h \
   util/check.h \
   util/epochguard.h \
-  common/error.h \
   util/exception.h \
   util/fastrange.h \
-  common/fees.h \
   util/fs.h \
   util/fs_helpers.h \
   util/getuniquepath.h \
@@ -309,17 +313,13 @@ BITCOIN_CORE_H = \
   util/hasher.h \
   util/insert.h \
   util/macros.h \
-  common/message.h \
   util/moneystr.h \
   util/overflow.h \
   util/overloaded.h \
   util/rbf.h \
-  common/readwritefile.h \
   util/result.h \
   util/serfloat.h \
   util/signalinterrupt.h \
-  common/sock.h \
-  common/spanparsing.h \
   util/string.h \
   util/syserror.h \
   util/thread.h \

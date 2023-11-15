@@ -14,10 +14,10 @@
 #include <uint256.h>
 
 #include <common/args.h>
-#include <span.h>
 #include <common/bip32.h>
-#include <util/check.h>
 #include <common/spanparsing.h>
+#include <span.h>
+#include <util/check.h>
 #include <util/strencodings.h>
 #include <util/vector.h>
 
