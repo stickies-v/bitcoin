@@ -9,7 +9,7 @@
 #include <test/util/setup_common.h>
 #include <util/check.h>
 #include <util/fs.h>
-#include <util/sock.h>
+#include <common/sock.h>
 #include <util/time.h>
 
 #include <csignal>

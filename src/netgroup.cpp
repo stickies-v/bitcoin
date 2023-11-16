@@ -5,7 +5,7 @@
 #include <netgroup.h>
 
 #include <hash.h>
-#include <util/asmap.h>
+#include <common/asmap.h>
 
 uint256 NetGroupManager::GetAsmapChecksum() const
 {

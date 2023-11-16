@@ -4,7 +4,7 @@
 
 #include <crypto/siphash.h>
 #include <random.h>
-#include <util/bytevectorhash.h>
+#include <common/bytevectorhash.h>
 
 #include <vector>
 

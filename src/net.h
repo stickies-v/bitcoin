@@ -28,7 +28,7 @@
 #include <sync.h>
 #include <uint256.h>
 #include <util/check.h>
-#include <util/sock.h>
+#include <common/sock.h>
 #include <util/threadinterrupt.h>
 
 #include <atomic>

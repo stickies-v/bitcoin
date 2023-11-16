@@ -9,7 +9,7 @@
 #include <netaddress.h>
 #include <sync.h>
 #include <util/fs.h>
-#include <util/sock.h>
+#include <common/sock.h>
 #include <util/threadinterrupt.h>
 
 #include <memory>

@@ -51,10 +51,10 @@
 #include <uint256.h>
 #include <univalue.h>
 #include <util/check.h>
-#include <util/error.h>
+#include <common/error.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
-#include <util/message.h>
+#include <common/message.h>
 #include <util/moneystr.h>
 #include <util/result.h>
 #include <util/string.h>

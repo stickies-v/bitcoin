@@ -4,7 +4,7 @@
 
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
-#include <util/spanparsing.h>
+#include <common/spanparsing.h>
 
 FUZZ_TARGET(spanparsing)
 {

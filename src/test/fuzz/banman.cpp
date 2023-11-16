@@ -11,7 +11,7 @@
 #include <test/fuzz/util/net.h>
 #include <test/util/setup_common.h>
 #include <util/fs.h>
-#include <util/readwritefile.h>
+#include <common/readwritefile.h>
 
 #include <cassert>
 #include <cstdint>

@@ -12,7 +12,7 @@
 #include <compat/compat.h>
 #include <netaddress.h>
 #include <serialize.h>
-#include <util/sock.h>
+#include <common/sock.h>
 #include <util/threadinterrupt.h>
 
 #include <functional>

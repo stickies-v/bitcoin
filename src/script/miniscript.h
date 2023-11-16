@@ -21,7 +21,7 @@
 #include <script/script.h>
 #include <span.h>
 #include <util/check.h>
-#include <util/spanparsing.h>
+#include <common/spanparsing.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/vector.h>

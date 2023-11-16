@@ -4,7 +4,7 @@
 
 #include <key_io.h>
 #include <rpc/util.h>
-#include <util/message.h>
+#include <common/message.h>
 #include <wallet/rpc/util.h>
 #include <wallet/wallet.h>
 

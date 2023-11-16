@@ -13,7 +13,7 @@
 #include <node/connection_types.h>
 #include <node/eviction.h>
 #include <sync.h>
-#include <util/sock.h>
+#include <common/sock.h>
 
 #include <algorithm>
 #include <array>

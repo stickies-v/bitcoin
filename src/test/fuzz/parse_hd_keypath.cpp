@@ -5,7 +5,7 @@
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
 #include <test/fuzz/util.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 
 #include <cstdint>
 #include <vector>

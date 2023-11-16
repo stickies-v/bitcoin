@@ -8,7 +8,7 @@
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
 #include <test/fuzz/util.h>
-#include <util/error.h>
+#include <common/error.h>
 #include <util/translation.h>
 
 #include <array>

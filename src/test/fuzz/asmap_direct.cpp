@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <netaddress.h>
-#include <util/asmap.h>
+#include <common/asmap.h>
 #include <test/fuzz/fuzz.h>
 
 #include <cstdint>

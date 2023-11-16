@@ -8,7 +8,7 @@
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
 #include <test/fuzz/util.h>
-#include <util/bytevectorhash.h>
+#include <common/bytevectorhash.h>
 #include <util/golombrice.h>
 
 #include <algorithm>

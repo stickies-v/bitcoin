@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <key_io.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 #include <util/strencodings.h>
 #include <wallet/wallet.h>
 

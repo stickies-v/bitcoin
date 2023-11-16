@@ -8,7 +8,7 @@
 #include <key_io.h>
 #include <pubkey.h>
 #include <uint256.h>
-#include <util/message.h>
+#include <common/message.h>
 #include <util/strencodings.h>
 
 #include <cassert>

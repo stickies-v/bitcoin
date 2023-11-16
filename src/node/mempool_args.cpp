@@ -14,7 +14,7 @@
 #include <policy/feerate.h>
 #include <policy/policy.h>
 #include <tinyformat.h>
-#include <util/error.h>
+#include <common/error.h>
 #include <util/moneystr.h>
 #include <util/translation.h>
 

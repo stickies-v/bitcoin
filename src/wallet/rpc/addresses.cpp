@@ -7,7 +7,7 @@
 #include <rpc/util.h>
 #include <script/script.h>
 #include <script/solver.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 #include <util/translation.h>
 #include <wallet/receive.h>
 #include <wallet/rpc/util.h>

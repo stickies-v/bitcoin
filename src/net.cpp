@@ -29,7 +29,7 @@
 #include <random.h>
 #include <scheduler.h>
 #include <util/fs.h>
-#include <util/sock.h>
+#include <common/sock.h>
 #include <util/strencodings.h>
 #include <util/thread.h>
 #include <util/threadinterrupt.h>

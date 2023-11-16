@@ -10,7 +10,7 @@
 #include <rpc/server.h>
 #include <rpc/util.h>
 #include <univalue.h>
-#include <util/message.h>
+#include <common/message.h>
 
 #include <string>
 

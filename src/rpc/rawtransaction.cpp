@@ -33,7 +33,7 @@
 #include <script/solver.h>
 #include <uint256.h>
 #include <undo.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 #include <util/check.h>
 #include <util/strencodings.h>
 #include <util/string.h>

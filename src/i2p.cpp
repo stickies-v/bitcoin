@@ -15,9 +15,9 @@
 #include <sync.h>
 #include <tinyformat.h>
 #include <util/fs.h>
-#include <util/readwritefile.h>
-#include <util/sock.h>
-#include <util/spanparsing.h>
+#include <common/readwritefile.h>
+#include <common/sock.h>
+#include <common/spanparsing.h>
 #include <util/strencodings.h>
 #include <util/threadinterrupt.h>
 

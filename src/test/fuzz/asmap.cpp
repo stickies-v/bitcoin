@@ -5,7 +5,7 @@
 #include <netaddress.h>
 #include <netgroup.h>
 #include <test/fuzz/fuzz.h>
-#include <util/asmap.h>
+#include <common/asmap.h>
 
 #include <cstdint>
 #include <vector>

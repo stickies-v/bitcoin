@@ -18,7 +18,7 @@
 #include <tinyformat.h>
 #include <util/check.h>
 #include <util/fs.h>
-#include <util/readwritefile.h>
+#include <common/readwritefile.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/thread.h>

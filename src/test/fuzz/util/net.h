@@ -15,7 +15,7 @@
 #include <test/fuzz/util.h>
 #include <test/util/net.h>
 #include <threadsafety.h>
-#include <util/sock.h>
+#include <common/sock.h>
 
 #include <chrono>
 #include <cstdint>

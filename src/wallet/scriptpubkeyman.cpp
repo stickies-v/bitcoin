@@ -10,7 +10,7 @@
 #include <script/script.h>
 #include <script/sign.h>
 #include <script/solver.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/time.h>

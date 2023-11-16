@@ -15,7 +15,7 @@
 #include <script/solver.h>
 #include <sync.h>
 #include <uint256.h>
-#include <util/bip32.h>
+#include <common/bip32.h>
 #include <util/fs.h>
 #include <util/time.h>
 #include <util/translation.h>
