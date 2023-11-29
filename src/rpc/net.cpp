@@ -679,7 +679,8 @@ static RPCHelpMan getnetworkinfo()
         obj.pushKV("localservicesnames", GetServicesNames(services));
     }
     if (node.peerman) {
-        obj.pushKV("localrelay", !node.peerman->IgnoresIncomingTxs());
+        auto peerman_info{node.peerman->GetInfo()};
+        obj.pushKV("localrelay", !peerman_info.ignores_incoming_txs);
     }
     obj.pushKV("timeoffset",    GetTimeOffset());
     if (node.connman) {
