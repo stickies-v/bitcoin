@@ -111,21 +111,29 @@ std::unique_ptr<CTxMemPool> MakeMempool(FuzzedDataProvider& fuzzed_data_provider
     // Take the default options for tests...
     CTxMemPool::Options mempool_opts{MemPoolOptionsForTest(node)};
 
+    while (true) {
+        // ...override specific options for this specific fuzz suite
+        mempool_opts.limits.ancestor_count = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 50);
+        mempool_opts.limits.ancestor_size_vbytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 202) * 1'000;
+        mempool_opts.limits.descendant_count = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 50);
+        do {
+            // Ensure descendants size doesn't exceed max, otherwise CTxMemPool::Make fails
+            // Speed up the fuzzer by isolating these 2 parameters instead of recalculating them all
+            mempool_opts.limits.descendant_size_vbytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 202) * 1'000;
+            mempool_opts.max_size_bytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 200) * 1'000'000;
+        } while (mempool_opts.max_size_bytes < mempool_opts.limits.descendant_size_vbytes * 40);
+        mempool_opts.expiry = std::chrono::hours{fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 999)};
+        nBytesPerSigOp = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(1, 999);
 
-    // ...override specific options for this specific fuzz suite
-    mempool_opts.limits.ancestor_count = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 50);
-    mempool_opts.limits.ancestor_size_vbytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 202) * 1'000;
-    mempool_opts.limits.descendant_count = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 50);
-    mempool_opts.limits.descendant_size_vbytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 202) * 1'000;
-    mempool_opts.max_size_bytes = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 200) * 1'000'000;
-    mempool_opts.expiry = std::chrono::hours{fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 999)};
-    nBytesPerSigOp = fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(1, 999);
+        mempool_opts.check_ratio = 1;
+        mempool_opts.require_standard = fuzzed_data_provider.ConsumeBool();
 
-    mempool_opts.check_ratio = 1;
-    mempool_opts.require_standard = fuzzed_data_provider.ConsumeBool();
-
-    // ...and construct a CTxMemPool from it
-    return std::move(Assert(CTxMemPool::Make(mempool_opts)).value());
+        // ...and construct a CTxMemPool from it. CTxMemPool::Make returns util::Error when invalid
+        // mempool_opts are provided, so in that case try again with different inputs.
+        if (auto mempool{CTxMemPool::Make(mempool_opts)}) {
+            return std::move(mempool.value());
+        }
+    }
 }
 
 FUZZ_TARGET(tx_package_eval, .init = initialize_tx_pool)
