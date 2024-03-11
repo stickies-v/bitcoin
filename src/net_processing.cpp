@@ -35,7 +35,6 @@
 #include <scheduler.h>
 #include <streams.h>
 #include <sync.h>
-#include <timedata.h>
 #include <tinyformat.h>
 #include <txmempool.h>
 #include <txorphanage.h>
@@ -3625,8 +3624,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         if (!pfrom.IsInboundConn()) {
             // Don't use timedata samples from inbound peers to make it
             // harder for others to tamper with our adjusted time.
-            AddTimeData(pfrom.addr, Ticks<std::chrono::seconds>(peer->m_time_offset.load()));
             m_outbound_time_offsets.Add(peer->m_time_offset);
+            m_outbound_time_offsets.WarnIfOutOfSync();
         }
 
         // If the peer is old enough to have the old alert system, send it the final alert.
