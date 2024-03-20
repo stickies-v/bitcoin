@@ -33,10 +33,10 @@ void SetfLargeWorkInvalidChainFound(bool flag)
     fLargeWorkInvalidChainFound = flag;
 }
 
-void SetMedianTimeOffsetWarning()
+void SetMedianTimeOffsetWarning(bool flag)
 {
     LOCK(g_warnings_mutex);
-    g_timeoffset_warning = true;
+    g_timeoffset_warning = flag;
 }
 bilingual_str GetWarnings(bool verbose)
 {

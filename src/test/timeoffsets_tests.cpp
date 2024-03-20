@@ -16,7 +16,7 @@ using namespace std::chrono_literals;
 void AddMulti(TimeOffsets& offsets, std::vector<std::chrono::seconds> to_add)
 {
     for (auto offset : to_add) {
-        offsets.Add(offset);
+        offsets.AddAndMaybeWarn(offset);
     }
 }
 
@@ -48,21 +48,21 @@ BOOST_AUTO_TEST_CASE(timeoffsets)
     BOOST_CHECK(offsets.Median() == 15s);
 }
 
-bool IsWarningRaised(std::vector<std::chrono::seconds> check_offsets)
+bool IsOutOfSync(std::vector<std::chrono::seconds> check_offsets)
 {
     TimeOffsets offsets{};
     AddMulti(offsets, check_offsets);
-    return offsets.WarnIfOutOfSync();
+    return offsets.IsOutOfSync();
 }
 
 
 BOOST_AUTO_TEST_CASE(timeoffsets_warning)
 {
-    BOOST_CHECK(IsWarningRaised({{-60min, -40min, -30min, 0min, 10min}}));
-    BOOST_CHECK(IsWarningRaised({5, 21min}));
+    BOOST_CHECK(IsOutOfSync({{-60min, -40min, -30min, 0min, 10min}}));
+    BOOST_CHECK(IsOutOfSync({5, 21min}));
 
-    BOOST_CHECK(!IsWarningRaised({4, 60min}));
-    BOOST_CHECK(!IsWarningRaised({100, 3min}));
+    BOOST_CHECK(!IsOutOfSync({4, 60min}));
+    BOOST_CHECK(!IsOutOfSync({100, 3min}));
 }
 
 

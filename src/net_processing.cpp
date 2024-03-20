@@ -3624,8 +3624,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         if (!pfrom.IsInboundConn()) {
             // Don't use timedata samples from inbound peers to make it
             // harder for others to tamper with our adjusted time.
-            m_outbound_time_offsets.Add(peer->m_time_offset);
-            m_outbound_time_offsets.WarnIfOutOfSync();
+            m_outbound_time_offsets.AddAndMaybeWarn(peer->m_time_offset);
         }
 
         // If the peer is old enough to have the old alert system, send it the final alert.

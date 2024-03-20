@@ -16,7 +16,7 @@ FUZZ_TARGET(timeoffsets)
     TimeOffsets offsets{};
     LIMITED_WHILE(fuzzed_data_provider.remaining_bytes() > 0, 4'000) {
         (void)offsets.Median();
-        offsets.Add(std::chrono::seconds{fuzzed_data_provider.ConsumeIntegral<int64_t>()});
-        offsets.WarnIfOutOfSync();
+        offsets.AddAndMaybeWarn(std::chrono::seconds{fuzzed_data_provider.ConsumeIntegral<int64_t>()});
+        offsets.IsOutOfSync();
     }
 }
