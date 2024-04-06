@@ -20,16 +20,35 @@
 
 using namespace std::chrono_literals;
 
-void TimeOffsets::Add(std::chrono::seconds offset)
+PeerClock::PeerClock(const std::chrono::system_clock::time_point& peer_time) : 
+    m_steady_connect_time{SteadyClock::now()},
+    m_system_connect_time{peer_time} {}
+
+void TimeOffsets::Add(PeerClock peer_clock)
 {
     LOCK(m_mutex);
 
     if (m_offsets.size() >= N) {
         m_offsets.pop_front();
     }
-    m_offsets.push_back(offset);
+    m_offsets.push_back(peer_clock);
     LogDebug(BCLog::NET, "Added time offset %+ds, total samples %d\n",
-             Ticks<std::chrono::seconds>(offset), m_offsets.size());
+             Ticks<std::chrono::seconds>(peer_clock.GetOffset()), m_offsets.size());
+}
+
+std::vector<std::chrono::seconds> TimeOffsets::GetSortedAdjustedOffsets() const
+{
+    AssertLockHeld(m_mutex);
+
+    std::vector<std::chrono::seconds> adj_offsets;
+    adj_offsets.reserve(m_offsets.size());
+
+    for (auto sample : m_offsets) {
+        adj_offsets.emplace_back(sample.GetOffset());
+    }
+
+    std::sort(adj_offsets.begin(), adj_offsets.end());
+    return adj_offsets;
 }
 
 std::chrono::seconds TimeOffsets::Median() const
@@ -39,9 +58,8 @@ std::chrono::seconds TimeOffsets::Median() const
     // Only calculate the median if we have 5 or more offsets
     if (m_offsets.size() < 5) return 0s;
 
-    auto sorted_copy = m_offsets;
-    std::sort(sorted_copy.begin(), sorted_copy.end());
-    return sorted_copy[m_offsets.size() / 2];  // approximate median is good enough, keep it simple
+    const auto sorted_adj_offsets{GetSortedAdjustedOffsets()};
+    return sorted_adj_offsets[sorted_adj_offsets.size() / 2];  // approximate median is good enough, keep it simple
 }
 
 bool TimeOffsets::WarnIfOutOfSync() const

@@ -6,11 +6,36 @@
 #define BITCOIN_NODE_TIMEOFFSETS_H
 
 #include <sync.h>
+#include <util/time.h>
 
 #include <chrono>
 #include <cstddef>
 #include <deque>
 #include <optional>
+#include <vector>
+
+class PeerClock
+{
+private:
+    std::chrono::steady_clock::time_point m_steady_connect_time;
+    std::chrono::system_clock::time_point m_system_connect_time;
+public:
+    PeerClock(const std::chrono::system_clock::time_point& peer_time = std::chrono::system_clock::now());
+    std::chrono::system_clock::time_point now() const {
+        const auto time_passed{std::chrono::duration_cast<std::chrono::seconds>(SteadyClock::now() - m_steady_connect_time)};
+        return m_system_connect_time + time_passed;
+    }
+    /** Positive adjustment means the system clock has shifted backwards, relative to the peer's
+     * reported time when we handshaked. In other words, the offset has increased.
+    */
+    std::chrono::seconds GetOffset() const {
+        std::system_clock::time_point peer_time{now()};
+        NodeClock::time_point local_time{NodeClock::now()};
+    
+        return peer_time - local_time;
+    }
+    //! Add templated conversion method to `std::chrono::...`
+};
 
 class TimeOffsets
 {
@@ -24,11 +49,13 @@ private:
     static constexpr std::chrono::minutes m_warning_wait{60};
 
     mutable Mutex m_mutex;
-    std::deque<std::chrono::seconds> m_offsets GUARDED_BY(m_mutex){};
+    std::deque<PeerClock> m_offsets GUARDED_BY(m_mutex){};
+
+    std::vector<std::chrono::seconds> GetSortedAdjustedOffsets() const EXCLUSIVE_LOCKS_REQUIRED(m_mutex);
 
 public:
     /** Add a new time offset sample. */
-    void Add(std::chrono::seconds offset) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+    void Add(PeerClock peer_clock) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
 
     /** Compute and return the median of the collected time offset samples. */
     std::chrono::seconds Median() const EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);

@@ -392,7 +392,7 @@ struct Peer {
 
     /** Time offset computed during the version handshake based on the
      * timestamp the peer send in the version message. */
-    std::atomic<std::chrono::seconds> m_time_offset{0s};
+    PeerClock m_clock{};
 
     explicit Peer(NodeId id, ServiceFlags our_services)
         : m_id{id}
@@ -1798,7 +1798,7 @@ bool PeerManagerImpl::GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) c
             stats.presync_height = peer->m_headers_sync->GetPresyncHeight();
         }
     }
-    stats.time_offset = peer->m_time_offset;
+    stats.time_offset = peer->m_clock.GetOffset();
 
     return true;
 }
@@ -3681,11 +3681,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                   peer->m_starting_height, addrMe.ToStringAddrPort(), fRelay, pfrom.GetId(),
                   remoteAddr, (mapped_as ? strprintf(", mapped_as=%d", mapped_as) : ""));
 
-        peer->m_time_offset = NodeSeconds{std::chrono::seconds{nTime}} - Now<NodeSeconds>();
+        peer->m_clock = {std::chrono::system_clock::from_time_t(nTime)};
         if (!pfrom.IsInboundConn()) {
             // Don't use timedata samples from inbound peers to make it
             // harder for others to tamper with our adjusted time.
-            m_outbound_time_offsets.Add(peer->m_time_offset);
+            m_outbound_time_offsets.Add(peer->m_clock);
             m_outbound_time_offsets.WarnIfOutOfSync();
         }
 
