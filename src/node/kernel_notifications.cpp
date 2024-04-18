@@ -13,11 +13,11 @@
 #include <logging.h>
 #include <node/abort.h>
 #include <node/interface_ui.h>
+#include <node/warnings.h>
 #include <util/check.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/translation.h>
-#include <warnings.h>
 
 #include <cstdint>
 #include <string>
@@ -46,7 +46,7 @@ static void AlertNotify(const std::string& strMessage)
 static void DoWarning(const bilingual_str& warning)
 {
     static bool fWarned = false;
-    SetMiscWarning(warning);
+    node::SetMiscWarning(warning);
     if (!fWarned) {
         AlertNotify(warning.original);
         fWarned = true;
