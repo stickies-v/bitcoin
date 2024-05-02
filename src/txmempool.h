@@ -675,6 +675,12 @@ public:
         return m_total_fee;
     }
 
+    bool exists(const Wtxid& wtxid) const EXCLUSIVE_LOCKS_REQUIRED(!cs)
+    {
+        LOCK(cs);
+        return (mapTx.get<index_by_wtxid>().count(wtxid.ToUint256()) > 0);
+    }
+
     bool exists(const GenTxid& gtxid) const
     {
         LOCK(cs);

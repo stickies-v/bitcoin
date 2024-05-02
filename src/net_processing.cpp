@@ -851,7 +851,12 @@ private:
     /** Stalling timeout for blocks in IBD */
     std::atomic<std::chrono::seconds> m_block_stalling_timeout{BLOCK_STALLING_TIMEOUT_DEFAULT};
 
-    /** Check whether we already have this gtxid in:
+    bool MaybeResetRecentRejects();
+
+    bool AlreadyHaveTx(const Txid& txid)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main, !m_recent_confirmed_transactions_mutex);
+
+    /** Check whether we already have this wtxid in:
      *  - mempool
      *  - orphanage
      *  - m_recent_rejects
@@ -860,7 +865,7 @@ private:
      * Also responsible for resetting m_recent_rejects and m_recent_rejects_reconsiderable if the
      * chain tip has changed.
      *  */
-    bool AlreadyHaveTx(const GenTxid& gtxid, bool include_reconsiderable)
+    bool AlreadyHaveTx(const Wtxid& wtxid, bool include_reconsiderable)
         EXCLUSIVE_LOCKS_REQUIRED(cs_main, !m_recent_confirmed_transactions_mutex);
 
     /**
@@ -2280,24 +2285,46 @@ void PeerManagerImpl::BlockChecked(const CBlock& block, const BlockValidationSta
 // Messages
 //
 
-
-bool PeerManagerImpl::AlreadyHaveTx(const GenTxid& gtxid, bool include_reconsiderable)
+/**
+ * If the chain tip has changed previously rejected transactions might be now valid, e.g. due to a
+ * nLockTime'd tx becoming valid, or a double-spend. Reset the rejects filter and give those txs a
+ * second chance.
+ */
+bool PeerManagerImpl::MaybeResetRecentRejects()
 {
     if (m_chainman.ActiveChain().Tip()->GetBlockHash() != hashRecentRejectsChainTip) {
-        // If the chain tip has changed previously rejected transactions
-        // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
-        // or a double-spend. Reset the rejects filter and give those
-        // txs a second chance.
         hashRecentRejectsChainTip = m_chainman.ActiveChain().Tip()->GetBlockHash();
         m_recent_rejects.reset();
         m_recent_rejects_reconsiderable.reset();
+        return true;
+    }
+    return false;
+}
+
+/** This overload should only be used when we cannot use the wtxid, e.g.
+ * because we don't have the witness data. It should *not* be used for
+ * non-segwit transactions.
+ * 
+ * There are less checks we can do when we don't have witness data.
+*/
+bool PeerManagerImpl::AlreadyHaveTx(const Txid& txid)
+{
+    const uint256& hash{txid.ToUint256()};
+
+    {
+        LOCK(m_recent_confirmed_transactions_mutex);
+        if (m_recent_confirmed_transactions.contains(hash)) return true;
     }
 
-    const uint256& hash = gtxid.GetHash();
+    return m_mempool.exists(GenTxid::Txid(hash));
+}
 
-    // Orphanage is checked by wtxid. However, even if this is a txid, look up the same hash in
-    // case this is a non-segwit transaction in the orphanage.
-    if (m_orphanage.HaveTx(Wtxid::FromUint256(gtxid.GetHash()))) return true;
+bool PeerManagerImpl::AlreadyHaveTx(const Wtxid& wtxid, bool include_reconsiderable)
+{
+    MaybeResetRecentRejects();
+    const uint256& hash{wtxid.ToUint256()};
+
+    if (m_orphanage.HaveTx(wtxid)) return true;
 
     if (include_reconsiderable && m_recent_rejects_reconsiderable.contains(hash)) return true;
 
@@ -2306,7 +2333,7 @@ bool PeerManagerImpl::AlreadyHaveTx(const GenTxid& gtxid, bool include_reconside
         if (m_recent_confirmed_transactions.contains(hash)) return true;
     }
 
-    return m_recent_rejects.contains(hash) || m_mempool.exists(gtxid);
+    return m_recent_rejects.contains(hash) || m_mempool.exists(wtxid);
 }
 
 bool PeerManagerImpl::AlreadyHaveBlock(const uint256& block_hash)
@@ -4225,7 +4252,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                     return;
                 }
                 const GenTxid gtxid = ToGenTxid(inv);
-                const bool fAlreadyHave = AlreadyHaveTx(gtxid, /*include_reconsiderable=*/true);
+                const auto wtxid{Wtxid::FromUint256(gtxid.GetHash())};  // if `inv` is non-segwit, txid and wtxid are the same
+                const bool fAlreadyHave = AlreadyHaveTx(wtxid, /*include_reconsiderable=*/true);
                 LogPrint(BCLog::NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom.GetId());
 
                 AddKnownTx(*peer, inv.hash);
@@ -4530,7 +4558,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         // already; and an adversary can already relay us old transactions
         // (older than our recency filter) if trying to DoS us, without any need
         // for witness malleation.
-        if (AlreadyHaveTx(GenTxid::Wtxid(wtxid), /*include_reconsiderable=*/true)) {
+        if (AlreadyHaveTx(ptx->GetWitnessHash(), /*include_reconsiderable=*/true)) {
             if (pfrom.HasPermission(NetPermissionFlags::ForceRelay)) {
                 // Always relay transactions received from peers with forcerelay
                 // permission, even if they were already in the mempool, allowing
@@ -4631,7 +4659,10 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                     AddKnownTx(*peer, parent_txid);
                     // Exclude m_recent_rejects_reconsiderable: the missing parent may have been
                     // previously rejected for being too low feerate. This orphan might CPFP it.
-                    if (!AlreadyHaveTx(gtxid, /*include_reconsiderable=*/false)) AddTxAnnouncement(pfrom, gtxid, current_time);
+                    // We use Wtxid even though parent_txid is a txid, because ??? (TODO: elaborate)
+                    if (!AlreadyHaveTx(Wtxid::FromUint256(parent_txid), /*include_reconsiderable=*/false)) {
+                        AddTxAnnouncement(pfrom, gtxid, current_time);
+                    }
                 }
 
                 if (m_orphanage.AddTx(ptx, pfrom.GetId())) {
@@ -6285,21 +6316,38 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
                 entry.second.GetHash().ToString(), entry.first);
         }
         for (const GenTxid& gtxid : requestable) {
-            // Exclude m_recent_rejects_reconsiderable: we may be requesting a missing parent
-            // that was previously rejected for being too low feerate.
-            if (!AlreadyHaveTx(gtxid, /*include_reconsiderable=*/false)) {
-                LogPrint(BCLog::NET, "Requesting %s %s peer=%d\n", gtxid.IsWtxid() ? "wtx" : "tx",
-                    gtxid.GetHash().ToString(), pto->GetId());
-                vGetData.emplace_back(gtxid.IsWtxid() ? MSG_WTX : (MSG_TX | GetFetchFlags(*peer)), gtxid.GetHash());
+            bool tx_exists;
+            uint256 tx_hash;
+            if (gtxid.IsWtxid()) {
+                const auto wtxid{Wtxid::FromUint256(gtxid.GetHash())};
+                tx_hash = wtxid.ToUint256();
+                // Exclude m_recent_rejects_reconsiderable: we may be requesting a missing parent
+                // that was previously rejected for being too low feerate.
+                tx_exists = AlreadyHaveTx(wtxid, /*include_reconsiderable=*/false);
+                if (!tx_exists) {
+                    LogPrint(BCLog::NET, "Requesting wtx %s peer=%d\n", wtxid.ToString() , pto->GetId());
+                    vGetData.emplace_back(MSG_WTX, wtxid.ToUint256());
+                }
+            } else {
+                const auto txid{Txid::FromUint256(gtxid.GetHash())};
+                tx_hash = txid.ToUint256();
+                tx_exists = AlreadyHaveTx(txid);
+                if (!tx_exists) {
+                    LogPrint(BCLog::NET, "Requesting tx %s peer=%d\n", txid.ToString() , pto->GetId());
+                    vGetData.emplace_back((MSG_TX | GetFetchFlags(*peer)), txid.ToUint256());
+                }
+            }
+
+            if (!tx_exists) {
                 if (vGetData.size() >= MAX_GETDATA_SZ) {
                     MakeAndPushMessage(*pto, NetMsgType::GETDATA, vGetData);
                     vGetData.clear();
                 }
-                m_txrequest.RequestedTx(pto->GetId(), gtxid.GetHash(), current_time + GETDATA_TX_INTERVAL);
+                m_txrequest.RequestedTx(pto->GetId(), tx_hash, current_time + GETDATA_TX_INTERVAL);
             } else {
                 // We have already seen this transaction, no need to download. This is just a belt-and-suspenders, as
                 // this should already be called whenever a transaction becomes AlreadyHaveTx().
-                m_txrequest.ForgetTxHash(gtxid.GetHash());
+                m_txrequest.ForgetTxHash(tx_hash);
             }
         }
 
