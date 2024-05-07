@@ -42,13 +42,6 @@ static void AlertNotify(const std::string& strMessage)
 #endif
 }
 
-static void DoWarning(const std::string& id, const bilingual_str& warning)
-{
-    if (node::g_warnings.Set(id, warning)) {
-        AlertNotify(warning.original);
-    }
-}
-
 namespace node {
 
 kernel::InterruptResult KernelNotifications::blockTip(SynchronizationState state, CBlockIndex& index)
@@ -75,23 +68,25 @@ void KernelNotifications::progress(const bilingual_str& title, int progress_perc
 
 void KernelNotifications::warningSet(const std::string& id, const bilingual_str& warning)
 {
-    DoWarning(id, warning);
+    if (m_warnings.Set(id, warning)) {
+        AlertNotify(warning.original);
+    }
 }
 
 void KernelNotifications::warningUnset(const std::string& id)
 {
-    g_warnings.Unset(id);
+    m_warnings.Unset(id);
 }
 
 void KernelNotifications::flushError(const bilingual_str& message)
 {
-    AbortNode(&m_shutdown, m_exit_status, message);
+    AbortNode(&m_shutdown, m_exit_status, message, &m_warnings);
 }
 
 void KernelNotifications::fatalError(const bilingual_str& message)
 {
     node::AbortNode(m_shutdown_on_fatal_error ? &m_shutdown : nullptr,
-                    m_exit_status, message);
+                    m_exit_status, message, &m_warnings);
 }
 
 void ReadNotificationArgs(const ArgsManager& args, KernelNotifications& notifications)

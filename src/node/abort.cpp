@@ -16,9 +16,9 @@
 
 namespace node {
 
-void AbortNode(util::SignalInterrupt* shutdown, std::atomic<int>& exit_status, const bilingual_str& message)
+void AbortNode(util::SignalInterrupt* shutdown, std::atomic<int>& exit_status, const bilingual_str& message, node::Warnings* warnings)
 {
-    g_warnings.Set("fatal-internal-error", message);
+    if (warnings) warnings->Set("fatal-internal-error", message);
     InitError(_("A fatal internal error occurred, see debug.log for details: ") + message);
     exit_status.store(EXIT_FAILURE);
     if (shutdown && !(*shutdown)()) {

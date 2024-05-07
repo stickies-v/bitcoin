@@ -38,6 +38,11 @@ enum class TransactionError;
 struct FlatSigningProvider;
 struct bilingual_str;
 
+namespace node
+{
+class Warnings;
+} // namespace node
+
 static constexpr bool DEFAULT_RPC_DOC_CHECK{
 #ifdef RPC_DOC_CHECK
     true
