@@ -37,8 +37,8 @@ public:
     /**
      * @brief Set a warning message. If a warning with the specified `id`
      *        already exists, false is returned and the new warning is
-     *        ignored. If `id` does not yet exist, the warning is set
-     *        and true is returned.
+     *        ignored. If `id` does not yet exist, the warning is set,
+     *        the UI is updated, and true is returned.
      *
      * @param[in]   id  Unique identifier of the warning. Uniqueness is
      *                  enforced only by the user.
@@ -50,8 +50,9 @@ public:
     bool Set(const std::string& id, const bilingual_str& message) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
     /**
      * @brief Unset a warning message. If a warning with the specified
-     *        `id` exists, it is unset and true is returned. Otherwise,
-     *        no warning is unset and false is returned
+     *        `id` exists, it is unset, the UI is updated, and true is
+     *        returned. Otherwise, no warning is unset and false is
+     *        returned
      *
      * @param[in]   id  Unique identifier of the warning. Uniqueness is
      *                  enforced only by the user.
