@@ -6,6 +6,7 @@
 #define BITCOIN_KERNEL_NOTIFICATIONS_INTERFACE_H
 
 #include <cstdint>
+#include <string>
 #include <variant>
 
 class CBlockIndex;
@@ -38,7 +39,8 @@ public:
     [[nodiscard]] virtual InterruptResult blockTip(SynchronizationState state, CBlockIndex& index) { return {}; }
     virtual void headerTip(SynchronizationState state, int64_t height, int64_t timestamp, bool presync) {}
     virtual void progress(const bilingual_str& title, int progress_percent, bool resume_possible) {}
-    virtual void warning(const bilingual_str& warning) {}
+    virtual void warningSet(const std::string& id, const bilingual_str& warning) {}
+    virtual void warningUnset(const std::string& id) {}
 
     //! The flush error notification is sent to notify the user that an error
     //! occurred while flushing block data to disk. Kernel code may ignore flush

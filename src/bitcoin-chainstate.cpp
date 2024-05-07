@@ -27,6 +27,7 @@
 #include <util/chaintype.h>
 #include <util/fs.h>
 #include <util/task_runner.h>
+#include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>
 
@@ -85,9 +86,13 @@ int main(int argc, char* argv[])
         {
             std::cout << "Progress: " << title.original << ", " << progress_percent << ", " << resume_possible << std::endl;
         }
-        void warning(const bilingual_str& warning) override
+        void warningSet(const std::string& id, const bilingual_str& warning) override
         {
-            std::cout << "Warning: " << warning.original << std::endl;
+            std::cout << "Warning " << id << " set: " << warning.original << std::endl;
+        }
+        void warningUnset(const std::string& id) override
+        {
+            std::cout << "Warning " << id << " unset" << std::endl;
         }
         void flushError(const bilingual_str& message) override
         {

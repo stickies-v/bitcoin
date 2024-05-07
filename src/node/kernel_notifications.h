@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <string>
 
 class ArgsManager;
 class CBlockIndex;
@@ -34,7 +35,9 @@ public:
 
     void progress(const bilingual_str& title, int progress_percent, bool resume_possible) override;
 
-    void warning(const bilingual_str& warning) override;
+    void warningSet(const std::string& id, const bilingual_str& warning) override;
+
+    void warningUnset(const std::string& id) override;
 
     void flushError(const bilingual_str& message) override;
 

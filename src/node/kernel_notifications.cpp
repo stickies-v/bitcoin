@@ -43,13 +43,10 @@ static void AlertNotify(const std::string& strMessage)
 #endif
 }
 
-static void DoWarning(const bilingual_str& warning)
+static void DoWarning(const std::string& id, const bilingual_str& warning)
 {
-    static bool fWarned = false;
-    node::SetMiscWarning(warning);
-    if (!fWarned) {
+    if (node::g_warnings.Set(id, warning)) {
         AlertNotify(warning.original);
-        fWarned = true;
     }
 }
 
@@ -77,9 +74,14 @@ void KernelNotifications::progress(const bilingual_str& title, int progress_perc
     uiInterface.ShowProgress(title.translated, progress_percent, resume_possible);
 }
 
-void KernelNotifications::warning(const bilingual_str& warning)
+void KernelNotifications::warningSet(const std::string& id, const bilingual_str& warning)
 {
-    DoWarning(warning);
+    DoWarning(id, warning);
+}
+
+void KernelNotifications::warningUnset(const std::string& id)
+{
+    g_warnings.Unset(id);
 }
 
 void KernelNotifications::flushError(const bilingual_str& message)

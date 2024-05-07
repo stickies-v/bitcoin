@@ -31,7 +31,6 @@
 #include <logging/timer.h>
 #include <node/blockstorage.h>
 #include <node/utxo_snapshot.h>
-#include <node/warnings.h>
 #include <policy/v3_policy.h>
 #include <policy/policy.h>
 #include <policy/rbf.h>
@@ -1864,9 +1863,12 @@ void Chainstate::CheckForkWarningConditions()
 
     if (m_chainman.m_best_invalid && m_chainman.m_best_invalid->nChainWork > m_chain.Tip()->nChainWork + (GetBlockProof(*m_chain.Tip()) * 6)) {
         LogPrintf("%s: Warning: Found invalid chain at least ~6 blocks longer than our best chain.\nChain state database corruption likely.\n", __func__);
-        node::SetfLargeWorkInvalidChainFound(true);
+        m_chainman.GetNotifications().warningSet(
+            "large-work-invalid-chain",
+            _("Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade.")
+        );
     } else {
-        node::SetfLargeWorkInvalidChainFound(false);
+        m_chainman.GetNotifications().warningUnset("large-work-invalid-chain");
     }
 }
 
@@ -2847,7 +2849,7 @@ void Chainstate::UpdateTip(const CBlockIndex* pindexNew)
             if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
                 const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
                 if (state == ThresholdState::ACTIVE) {
-                    m_chainman.GetNotifications().warning(warning);
+                    m_chainman.GetNotifications().warningSet("unknown-new-rules-activated", warning);
                 } else {
                     warning_messages.push_back(warning);
                 }
