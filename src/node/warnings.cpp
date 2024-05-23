@@ -21,12 +21,12 @@ Warnings::Warnings()
     // Pre-release build warning
     if (!CLIENT_VERSION_IS_RELEASE) {
         m_warnings.insert(
-            {"pre-release-test-build",
+            {Warning::PRE_RELEASE_TEST_BUILD,
             _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications")}
         );
     }
 }
-bool Warnings::Set(const std::string& id, const bilingual_str& message)
+bool Warnings::Set(warning_t id, const bilingual_str& message)
 {
     LOCK(m_mutex);
     const auto& [_, inserted]{m_warnings.insert({id, message})};
@@ -34,7 +34,7 @@ bool Warnings::Set(const std::string& id, const bilingual_str& message)
     return inserted;
 }
 
-bool Warnings::Unset(const std::string& id)
+bool Warnings::Unset(warning_t id)
 {
     auto success{WITH_LOCK(m_mutex, return m_warnings.erase(id))};
     if (success) uiInterface.NotifyAlertChanged();

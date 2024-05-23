@@ -15,7 +15,16 @@
 
 class UniValue;
 
+namespace kernel {
+enum class Warning;
+} // namespace kernel
+
 namespace node {
+enum class Warning {
+    CLOCK_OUT_OF_SYNC,
+    PRE_RELEASE_TEST_BUILD,
+    FATAL_INTERNAL_ERROR,
+};
 /**
  * @class Warnings
  * @brief Manages warning messages within a node.
@@ -27,11 +36,14 @@ namespace node {
  */
 class Warnings
 {
+public:
+    typedef std::variant<kernel::Warning, node::Warning> warning_t;
+private:
     mutable Mutex m_mutex;
-    std::map<std::string, bilingual_str> m_warnings GUARDED_BY(m_mutex);
+    std::map<warning_t, bilingual_str> m_warnings GUARDED_BY(m_mutex);
 public:
     Warnings();
-    //! Warnings should always be passed by reference, never copied.
+    //! A warnings instance should always be passed by reference, never copied.
     Warnings(const Warnings&) = delete;
     Warnings& operator=(const Warnings&) = delete;
     /**
@@ -40,27 +52,25 @@ public:
      *        ignored. If `id` does not yet exist, the warning is set,
      *        the UI is updated, and true is returned.
      *
-     * @param[in]   id  Unique identifier of the warning. Uniqueness is
-     *                  enforced only by the user.
+     * @param[in]   id  Unique identifier of the warning.
      * @param[in]   message Warning message to be shown.
      *
      * @returns true if the warning was indeed set (i.e. there is no
      *          existing warning with this `id`), otherwise false.
      */
-    bool Set(const std::string& id, const bilingual_str& message) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+    bool Set(warning_t id, const bilingual_str& message) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
     /**
      * @brief Unset a warning message. If a warning with the specified
      *        `id` exists, it is unset, the UI is updated, and true is
      *        returned. Otherwise, no warning is unset and false is
      *        returned
      *
-     * @param[in]   id  Unique identifier of the warning. Uniqueness is
-     *                  enforced only by the user.
+     * @param[in]   id  Unique identifier of the warning.
      *
      * @returns true if the warning was indeed unset (i.e. there is an
      *          existing warning with this `id`), otherwise false.
      */
-    bool Unset(const std::string& id) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+    bool Unset(warning_t id) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
     /** Return potential problems detected by the node. */
     std::vector<bilingual_str> GetMessages() const EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
 };

@@ -16,21 +16,21 @@ BOOST_AUTO_TEST_CASE(warnings)
 {
     node::Warnings warnings;
     // On pre-release builds, a warning is generated automatically
-    warnings.Unset("pre-release-test-build");
+    warnings.Unset(node::Warning::PRE_RELEASE_TEST_BUILD);
 
     // Ensure we start without any warnings
     BOOST_CHECK(warnings.GetMessages().size() == 0);
     // Add two warnings
-    BOOST_CHECK(warnings.Set("w1", _("warning 1")));
-    BOOST_CHECK(warnings.Set("w2", _("warning 2")));
+    BOOST_CHECK(warnings.Set(node::Warning::CLOCK_OUT_OF_SYNC, _("warning 1")));
+    BOOST_CHECK(warnings.Set(node::Warning::FATAL_INTERNAL_ERROR, _("warning 2")));
     // Unset the second one
-    BOOST_CHECK(warnings.Unset("w2"));
+    BOOST_CHECK(warnings.Unset(node::Warning::FATAL_INTERNAL_ERROR));
     // Since it's already been unset, this should return false
-    BOOST_CHECK(!warnings.Unset("w2"));
+    BOOST_CHECK(!warnings.Unset(node::Warning::FATAL_INTERNAL_ERROR));
     // We should now be able to set w2 again
-    BOOST_CHECK(warnings.Set("w2", _("warning 2 - revision 1")));
+    BOOST_CHECK(warnings.Set(node::Warning::FATAL_INTERNAL_ERROR, _("warning 2 - revision 1")));
     // Setting w2 again should return false since it's already set
-    BOOST_CHECK(!warnings.Set("w2", _("warning 2 - revision 2")));
+    BOOST_CHECK(!warnings.Set(node::Warning::FATAL_INTERNAL_ERROR, _("warning 2 - revision 2")));
 
     // Verify messages are correct
     const auto messages{warnings.GetMessages()};
@@ -39,8 +39,8 @@ BOOST_AUTO_TEST_CASE(warnings)
     BOOST_CHECK(messages[1].original == "warning 2 - revision 1");
 
     // Clearing all warnings should also clear all messages
-    BOOST_CHECK(warnings.Unset("w1"));
-    BOOST_CHECK(warnings.Unset("w2"));
+    BOOST_CHECK(warnings.Unset(node::Warning::CLOCK_OUT_OF_SYNC));
+    BOOST_CHECK(warnings.Unset(node::Warning::FATAL_INTERNAL_ERROR));
     BOOST_CHECK(warnings.GetMessages().size() == 0);
 }
 

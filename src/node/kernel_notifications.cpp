@@ -10,6 +10,7 @@
 #include <common/args.h>
 #include <common/system.h>
 #include <kernel/context.h>
+#include <kernel/warning.h>
 #include <logging.h>
 #include <node/abort.h>
 #include <node/interface_ui.h>
@@ -66,14 +67,14 @@ void KernelNotifications::progress(const bilingual_str& title, int progress_perc
     uiInterface.ShowProgress(title.translated, progress_percent, resume_possible);
 }
 
-void KernelNotifications::warningSet(const std::string& id, const bilingual_str& warning)
+void KernelNotifications::warningSet(kernel::Warning id, const bilingual_str& warning)
 {
     if (m_warnings.Set(id, warning)) {
         AlertNotify(warning.original);
     }
 }
 
-void KernelNotifications::warningUnset(const std::string& id)
+void KernelNotifications::warningUnset(kernel::Warning id)
 {
     m_warnings.Unset(id);
 }

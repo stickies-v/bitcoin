@@ -16,6 +16,10 @@ class CBlockIndex;
 enum class SynchronizationState;
 struct bilingual_str;
 
+namespace kernel {
+enum class Warning;
+} // namespace kernel
+
 namespace util {
 class SignalInterrupt;
 } // namespace util
@@ -37,9 +41,9 @@ public:
 
     void progress(const bilingual_str& title, int progress_percent, bool resume_possible) override;
 
-    void warningSet(const std::string& id, const bilingual_str& warning) override;
+    void warningSet(kernel::Warning id, const bilingual_str& warning) override;
 
-    void warningUnset(const std::string& id) override;
+    void warningUnset(kernel::Warning id) override;
 
     void flushError(const bilingual_str& message) override;
 
