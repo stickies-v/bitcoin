@@ -335,9 +335,6 @@ public:
     //! Run function after given number of seconds. Cancel any previous calls with same name.
     virtual void rpcRunLater(const std::string& name, std::function<void()> fn, int64_t seconds) = 0;
 
-    //! Get settings value.
-    virtual common::SettingsValue getSetting(const std::string& arg) = 0;
-
     //! Get list of settings values.
     virtual std::vector<common::SettingsValue> getSettingsList(const std::string& arg) = 0;
 

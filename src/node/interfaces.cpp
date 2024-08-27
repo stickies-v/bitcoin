@@ -796,10 +796,6 @@ public:
     {
         RPCRunLater(name, std::move(fn), seconds);
     }
-    common::SettingsValue getSetting(const std::string& name) override
-    {
-        return args().GetSetting(name);
-    }
     std::vector<common::SettingsValue> getSettingsList(const std::string& name) override
     {
         return args().GetSettingsList(name);
