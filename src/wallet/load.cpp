@@ -69,14 +69,14 @@ bool VerifyWallets(WalletContext& context)
             // Pass write=false because no need to write file and probably
             // better not to. If unnamed wallet needs to be added next startup
             // and the setting is empty, this code will just run again.
-            chain.updateRwSetting("wallet", wallets, /* write= */ false);
+            args.UpdateRwSetting("wallet", wallets, /* write= */ false);
         }
     }
 
     // Keep track of each wallet absolute path to detect duplicates.
     std::set<fs::path> wallet_paths;
 
-    for (const auto& wallet : chain.getSettingsList("wallet")) {
+    for (const auto& wallet : args.GetSettingsList("wallet")) {
         const auto& wallet_file = wallet.get_str();
         const fs::path path = fsbridge::AbsPathJoin(GetWalletDir(), fs::PathFromString(wallet_file));
 
@@ -107,16 +107,17 @@ bool VerifyWallets(WalletContext& context)
 bool LoadWallets(WalletContext& context)
 {
     interfaces::Chain& chain = *context.chain;
+    ArgsManager& args{*Assert(context.args)};
     try {
         std::set<fs::path> wallet_paths;
-        for (const auto& wallet : chain.getSettingsList("wallet")) {
+        for (const auto& wallet : args.GetSettingsList("wallet")) {
             const auto& name = wallet.get_str();
             if (!wallet_paths.insert(fs::PathFromString(name)).second) {
                 continue;
             }
             DatabaseOptions options;
             DatabaseStatus status;
-            ReadDatabaseArgs(*context.args, options);
+            ReadDatabaseArgs(args, options);
             options.require_existing = true;
             options.verify = false; // No need to verify, assuming verified earlier in VerifyWallets()
             bilingual_str error;

@@ -161,6 +161,14 @@ protected:
      */
     common::SettingsValue GetSetting(const std::string& arg) const;
 
+
+    //! Return <datadir>/settings.json setting value.
+    common::SettingsValue GetRwSetting(const std::string& arg);
+
+    //! Write a setting to <datadir>/settings.json. Optionally just update the
+    //! setting in memory and do not write the file.
+    bool UpdateRwSetting(const std::string& arg, const common::SettingsValue& value, bool write = true);
+
     /**
      * Get list of setting values.
      */

@@ -91,38 +91,38 @@ using util::ToString;
 
 namespace wallet {
 
-bool AddWalletSetting(interfaces::Chain& chain, const std::string& wallet_name)
+bool AddWalletSetting(ArgsManager& args, const std::string& wallet_name)
 {
-    common::SettingsValue setting_value = chain.getRwSetting("wallet");
+    common::SettingsValue setting_value = args.GetRwSetting("wallet");
     if (!setting_value.isArray()) setting_value.setArray();
     for (const common::SettingsValue& value : setting_value.getValues()) {
         if (value.isStr() && value.get_str() == wallet_name) return true;
     }
     setting_value.push_back(wallet_name);
-    return chain.updateRwSetting("wallet", setting_value);
+    return args.UpdateRwSetting("wallet", setting_value);
 }
 
-bool RemoveWalletSetting(interfaces::Chain& chain, const std::string& wallet_name)
+bool RemoveWalletSetting(ArgsManager& args, const std::string& wallet_name)
 {
-    common::SettingsValue setting_value = chain.getRwSetting("wallet");
+    common::SettingsValue setting_value = args.GetRwSetting("wallet");
     if (!setting_value.isArray()) return true;
     common::SettingsValue new_value(common::SettingsValue::VARR);
     for (const common::SettingsValue& value : setting_value.getValues()) {
         if (!value.isStr() || value.get_str() != wallet_name) new_value.push_back(value);
     }
     if (new_value.size() == setting_value.size()) return true;
-    return chain.updateRwSetting("wallet", new_value);
+    return args.UpdateRwSetting("wallet", new_value);
 }
 
-static void UpdateWalletSetting(interfaces::Chain& chain,
+static void UpdateWalletSetting(ArgsManager& args,
                                 const std::string& wallet_name,
                                 std::optional<bool> load_on_startup,
                                 std::vector<bilingual_str>& warnings)
 {
     if (!load_on_startup) return;
-    if (load_on_startup.value() && !AddWalletSetting(chain, wallet_name)) {
+    if (load_on_startup.value() && !AddWalletSetting(args, wallet_name)) {
         warnings.emplace_back(Untranslated("Wallet load on startup setting could not be updated, so wallet may not be loaded next node startup."));
-    } else if (!load_on_startup.value() && !RemoveWalletSetting(chain, wallet_name)) {
+    } else if (!load_on_startup.value() && !RemoveWalletSetting(args, wallet_name)) {
         warnings.emplace_back(Untranslated("Wallet load on startup setting could not be updated, so wallet may still be loaded next node startup."));
     }
 }
@@ -157,7 +157,6 @@ bool RemoveWallet(WalletContext& context, const std::shared_ptr<CWallet>& wallet
 {
     assert(wallet);
 
-    interfaces::Chain& chain = wallet->chain();
     std::string name = wallet->GetName();
 
     // Unregister with the validation interface which also drops shared pointers.
@@ -172,7 +171,7 @@ bool RemoveWallet(WalletContext& context, const std::shared_ptr<CWallet>& wallet
     wallet->NotifyUnload();
 
     // Write the wallet setting
-    UpdateWalletSetting(chain, name, load_on_start, warnings);
+    UpdateWalletSetting(*Assert(context.args), name, load_on_start, warnings);
 
     return true;
 }
@@ -293,7 +292,7 @@ std::shared_ptr<CWallet> LoadWalletInternal(WalletContext& context, const std::s
         wallet->postInitProcess();
 
         // Write the wallet setting
-        UpdateWalletSetting(*context.chain, name, load_on_start, warnings);
+        UpdateWalletSetting(*Assert(context.args), name, load_on_start, warnings);
 
         return wallet;
     } catch (const std::runtime_error& e) {
@@ -474,7 +473,7 @@ std::shared_ptr<CWallet> CreateWallet(WalletContext& context, const std::string&
     wallet->postInitProcess();
 
     // Write the wallet settings
-    UpdateWalletSetting(*context.chain, name, load_on_start, warnings);
+    UpdateWalletSetting(*Assert(context.args), name, load_on_start, warnings);
 
     // Legacy wallets are being deprecated, warn if a newly created wallet is legacy
     if (!(wallet_creation_flags & WALLET_FLAG_DESCRIPTORS)) {
@@ -4324,7 +4323,7 @@ bool DoMigration(CWallet& wallet, WalletContext& context, bilingual_str& error, 
             }
 
             // Add the wallet to settings
-            UpdateWalletSetting(*context.chain, wallet_name, /*load_on_startup=*/true, warnings);
+            UpdateWalletSetting(*Assert(context.args), wallet_name, /*load_on_startup=*/true, warnings);
         }
         if (data->solvable_descs.size() > 0) {
             wallet.WalletLogPrintf("Making a new watchonly wallet containing the unwatched solvable scripts\n");
@@ -4361,7 +4360,7 @@ bool DoMigration(CWallet& wallet, WalletContext& context, bilingual_str& error, 
             }
 
             // Add the wallet to settings
-            UpdateWalletSetting(*context.chain, wallet_name, /*load_on_startup=*/true, warnings);
+            UpdateWalletSetting(*Assert(context.args), wallet_name, /*load_on_startup=*/true, warnings);
         }
     }
 

@@ -811,6 +811,29 @@ std::vector<common::SettingsValue> ArgsManager::GetSettingsList(const std::strin
     return common::GetSettingsList(m_settings, m_network, SettingName(arg), !UseDefaultSection(arg));
 }
 
+common::SettingsValue ArgsManager::GetRwSetting(const std::string& arg)
+{
+    common::SettingsValue result;
+    LockSettings([&](const common::Settings& settings) {
+        if (const common::SettingsValue* value = common::FindKey(settings.rw_settings, arg)) {
+            result = *value;
+        }
+    });
+    return result;
+}
+bool ArgsManager::UpdateRwSetting(const std::string& arg, const common::SettingsValue& value, bool write)
+{
+    LockSettings([&](common::Settings& settings) {
+        if (value.isNull()) {
+            settings.rw_settings.erase(arg);
+        } else {
+            settings.rw_settings[arg] = value;
+        }
+    });
+    return !write || WriteSettingsFile();
+}
+
+
 void ArgsManager::logArgsPrefix(
     const std::string& prefix,
     const std::string& section,

@@ -153,14 +153,7 @@ public:
     common::SettingsValue getPersistentSetting(const std::string& name) override { return args().GetPersistentSetting(name); }
     void updateRwSetting(const std::string& name, const common::SettingsValue& value) override
     {
-        args().LockSettings([&](common::Settings& settings) {
-            if (value.isNull()) {
-                settings.rw_settings.erase(name);
-            } else {
-                settings.rw_settings[name] = value;
-            }
-        });
-        args().WriteSettingsFile();
+        args().UpdateRwSetting(name, value, /*write=*/true);
     }
     void forceSetting(const std::string& name, const common::SettingsValue& value) override
     {
@@ -796,31 +789,6 @@ public:
     {
         RPCRunLater(name, std::move(fn), seconds);
     }
-    std::vector<common::SettingsValue> getSettingsList(const std::string& name) override
-    {
-        return args().GetSettingsList(name);
-    }
-    common::SettingsValue getRwSetting(const std::string& name) override
-    {
-        common::SettingsValue result;
-        args().LockSettings([&](const common::Settings& settings) {
-            if (const common::SettingsValue* value = common::FindKey(settings.rw_settings, name)) {
-                result = *value;
-            }
-        });
-        return result;
-    }
-    bool updateRwSetting(const std::string& name, const common::SettingsValue& value, bool write) override
-    {
-        args().LockSettings([&](common::Settings& settings) {
-            if (value.isNull()) {
-                settings.rw_settings.erase(name);
-            } else {
-                settings.rw_settings[name] = value;
-            }
-        });
-        return !write || args().WriteSettingsFile();
-    }
     void requestMempoolTransactions(Notifications& notifications) override
     {
         if (!m_node.mempool) return;
@@ -835,7 +803,6 @@ public:
     }
 
     NodeContext* context() override { return &m_node; }
-    ArgsManager& args() { return *Assert(m_node.args); }
     ChainstateManager& chainman() { return *Assert(m_node.chainman); }
     ValidationSignals& validation_signals() { return *Assert(m_node.validation_signals); }
     NodeContext& m_node;
