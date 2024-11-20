@@ -15,7 +15,7 @@
 
 #include <common/system.h>
 #include <interfaces/node.h>
-#include <node/chainstatemanager_args.h>
+#include <kernel/chainstatemanager_opts.h>
 #include <netbase.h>
 #include <txdb.h>
 #include <util/strencodings.h>

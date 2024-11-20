@@ -12,6 +12,7 @@
 #include <script/sigcache.h>
 #include <txdb.h>
 #include <uint256.h>
+#include <util/bounded_int.h>
 #include <util/time.h>
 
 #include <cstdint>
@@ -23,6 +24,10 @@ class ValidationSignals;
 
 static constexpr bool DEFAULT_CHECKPOINTS_ENABLED{true};
 static constexpr auto DEFAULT_MAX_TIP_AGE{24h};
+/** Maximum number of dedicated script-checking threads allowed */
+static constexpr int MAX_SCRIPTCHECK_THREADS{15};
+/** -par default (number of script-checking threads, 0 = auto) */
+static constexpr int DEFAULT_SCRIPTCHECK_THREADS{0};
 
 namespace kernel {
 
@@ -48,7 +53,7 @@ struct ChainstateManagerOpts {
     Notifications& notifications;
     ValidationSignals* signals{nullptr};
     //! Number of script check worker threads. Zero means no parallel verification.
-    int worker_threads_num{0};
+    BoundedInt<int, 0, MAX_SCRIPTCHECK_THREADS> worker_threads_num{DEFAULT_SCRIPTCHECK_THREADS};
     size_t script_execution_cache_bytes{DEFAULT_SCRIPT_EXECUTION_CACHE_BYTES};
     size_t signature_cache_bytes{DEFAULT_SIGNATURE_CACHE_BYTES};
 };

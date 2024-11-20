@@ -32,6 +32,7 @@
 #include <interfaces/ipc.h>
 #include <interfaces/mining.h>
 #include <interfaces/node.h>
+#include <kernel/chainstatemanager_opts.h>
 #include <kernel/context.h>
 #include <key.h>
 #include <logging.h>
