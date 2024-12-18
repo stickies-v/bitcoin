@@ -884,12 +884,13 @@ void kernel_chainstate_load_options_destroy(kernel_ChainstateLoadOptions* chains
 ///@{
 
 /**
- * @brief Create a chainstate manager. This is the main object for many
+ * @brief Create and load a chainstate manager. This is the main object for many
  * validation tasks as well as for retrieving data from the chain. It is only
  * valid for as long as the passed in context also remains in memory.
  *
  * @param[in] chainstate_manager_options Non-null, created by @ref kernel_chainstate_manager_options_create.
  * @param[in] block_manager_options      Non-null, created by @ref kernel_block_manager_options_create.
+ * @param[in] chainstate_load_options Non-null, created by @ref kernel_chainstate_load_options_create.
  * @param[in] context                    Non-null, the created chainstate manager will associate with this
  *                                       kernel context for the duration of its lifetime. The same context
  *                                       needs to be used for later interactions with the chainstate manager.
@@ -898,26 +899,12 @@ void kernel_chainstate_load_options_destroy(kernel_ChainstateLoadOptions* chains
 kernel_ChainstateManager* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_chainstate_manager_create(
     const kernel_Context* context,
     const kernel_ChainstateManagerOptions* chainstate_manager_options,
-    const kernel_BlockManagerOptions* block_manager_options
-) BITCOINKERNEL_ARG_NONNULL(1, 2, 3);
+    const kernel_BlockManagerOptions* block_manager_options,
+    const kernel_ChainstateLoadOptions* chainstate_load_options
+) BITCOINKERNEL_ARG_NONNULL(1, 2, 3, 4);
 
 /**
- * @brief This function must be called to initialize the chainstate manager
- * before doing validation tasks or interacting with its indexes.
- *
- * @param[in] context                 Non-null.
- * @param[in] chainstate_load_options Non-null, created by @ref kernel_chainstate_load_options_create.
- * @param[in] chainstate_manager      Non-null, will load the chainstate(s) and initialize indexes.
- * @return                            True on success, false on error.
- */
-bool BITCOINKERNEL_WARN_UNUSED_RESULT kernel_chainstate_manager_load_chainstate(
-    const kernel_Context* context,
-    const kernel_ChainstateLoadOptions* chainstate_load_options,
-    kernel_ChainstateManager* chainstate_manager
-) BITCOINKERNEL_ARG_NONNULL(1, 2, 3);
-
-/**
- * @brief May be called after kernel_chainstate_manager_load_chainstate to
+ * @brief May be called after kernel_chainstate_manager_create to
  * initialize the chainstate manager. Triggers the start of a reindex if the
  * option was previously set for the chainstate and block manager. Can also
  * import an array of existing block files selected by the user.

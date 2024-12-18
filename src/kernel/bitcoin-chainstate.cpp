@@ -167,11 +167,10 @@ int main(int argc, char* argv[])
     BlockManagerOptions blockman_opts{context, abs_datadir / "blocks"};
     assert(blockman_opts);
 
-    auto chainman{std::make_unique<ChainMan>(context, chainman_opts, blockman_opts)};
+    ChainstateLoadOptions chainstate_load_opts{};
+    auto chainman{std::make_unique<ChainMan>(context, chainman_opts, blockman_opts, chainstate_load_opts)};
     assert(chainman);
 
-    ChainstateLoadOptions chainstate_load_opts{};
-    assert(chainman->LoadChainstate(chainstate_load_opts));
 
     std::cout << "Enter the block you want to validate on the next line:" << std::endl;
 
