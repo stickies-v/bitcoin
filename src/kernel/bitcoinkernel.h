@@ -435,6 +435,15 @@ typedef struct {
     size_t size;
 } kernel_ByteArray;
 
+typedef struct {
+    const char* version;
+    size_t version_len;
+} kernel_Version;
+
+kernel_Version* kernel_get_version();
+
+void kernel_version_destroy(kernel_Version* version);
+
 /** @name Transaction
  * Functions for working with transactions.
  */

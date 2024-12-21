@@ -5,6 +5,7 @@
 #include <kernel/bitcoinkernel.h>
 
 #include <chain.h>
+#include <clientversion.h>
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
@@ -385,6 +386,13 @@ const CBlockUndo* cast_const_block_undo(const kernel_BlockUndo* undo)
 
 } // namespace
 
+kernel_Version* kernel_get_version()
+{
+    const auto version_str{FormatFullVersion()};
+    auto version = new kernel_Version{version_str.data(), version_str.length()};
+    return version;
+}
+
 kernel_Transaction* kernel_transaction_create(const unsigned char* raw_transaction, size_t raw_transaction_len)
 {
     try {
@@ -393,6 +401,13 @@ kernel_Transaction* kernel_transaction_create(const unsigned char* raw_transacti
         return reinterpret_cast<kernel_Transaction*>(tx);
     } catch (const std::exception&) {
         return nullptr;
+    }
+}
+
+void kernel_version_destroy(kernel_Version* version)
+{
+    if (version) {
+        delete version;
     }
 }
 
