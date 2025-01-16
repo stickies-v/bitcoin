@@ -1966,6 +1966,14 @@ BOOST_AUTO_TEST_CASE(saturating_left_shift_test)
     TestSaturatingLeftShift<int64_t>();
 }
 
+BOOST_AUTO_TEST_CASE(mb_string_literal_test)
+{
+    BOOST_CHECK_EQUAL(0_MB, 0);
+    BOOST_CHECK_EQUAL(1_MB, 1000000);
+    const auto max_mb{std::numeric_limits<size_t>::max() / 1'000'000};
+    BOOST_CHECK_EXCEPTION(operator""_MB(static_cast<unsigned long long>(max_mb) + 1), std::overflow_error, HasReason("MB value too large for size_t byte conversion"));
+}
+
 BOOST_AUTO_TEST_CASE(mib_string_literal_test)
 {
     BOOST_CHECK_EQUAL(0_MiB, 0);

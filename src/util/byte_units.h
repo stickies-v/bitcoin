@@ -9,6 +9,15 @@
 
 #include <stdexcept>
 
+//! Overflow-safe conversion of MB to bytes.
+constexpr size_t operator"" _MB(unsigned long long megabytes)
+{
+    if (megabytes > std::numeric_limits<size_t>::max() / 1'000'000) {
+        throw std::overflow_error("MB value too large for size_t byte conversion");
+    }
+    return megabytes * 1'000'000;
+}
+
 //! Overflow-safe conversion of MiB to bytes.
 constexpr size_t operator"" _MiB(unsigned long long mebibytes)
 {
