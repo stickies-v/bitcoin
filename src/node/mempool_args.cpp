@@ -42,7 +42,10 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
 {
     mempool_opts.check_ratio = argsman.GetIntArg("-checkmempool", mempool_opts.check_ratio);
 
-    if (auto mb = argsman.GetIntArg("-maxmempool")) mempool_opts.max_size_bytes = *mb * 1'000'000;
+    if (auto mb = argsman.GetIntArg("-maxmempool")) {
+        *mb = std::clamp<int64_t>(*mb, 0, std::numeric_limits<size_t>::max() / 1'000'000);
+        mempool_opts.max_size_bytes = *mb * 1'000'000;
+    }
 
     if (auto hours = argsman.GetIntArg("-mempoolexpiry")) mempool_opts.expiry = std::chrono::hours{*hours};
 

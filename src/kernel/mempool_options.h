@@ -5,9 +5,9 @@
 #define BITCOIN_KERNEL_MEMPOOL_OPTIONS_H
 
 #include <kernel/mempool_limits.h>
-
 #include <policy/feerate.h>
 #include <policy/policy.h>
+#include <util/byte_units.h>
 
 #include <chrono>
 #include <cstdint>
@@ -15,10 +15,10 @@
 
 class ValidationSignals;
 
-/** Default for -maxmempool, maximum megabytes of mempool memory usage */
-static constexpr unsigned int DEFAULT_MAX_MEMPOOL_SIZE_MB{300};
+/** Default for -maxmempool, maximum bytes of mempool memory usage */
+static constexpr size_t DEFAULT_MAX_MEMPOOL_SIZE{300_MB};
 /** Default for -maxmempool when blocksonly is set */
-static constexpr unsigned int DEFAULT_BLOCKSONLY_MAX_MEMPOOL_SIZE_MB{5};
+static constexpr size_t DEFAULT_BLOCKSONLY_MAX_MEMPOOL_SIZE{5_MB};
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static constexpr unsigned int DEFAULT_MEMPOOL_EXPIRY_HOURS{336};
 /** Whether to fall back to legacy V1 serialization when writing mempool.dat */
@@ -37,7 +37,7 @@ namespace kernel {
 struct MemPoolOptions {
     /* The ratio used to determine how often sanity checks will run.  */
     int check_ratio{0};
-    int64_t max_size_bytes{DEFAULT_MAX_MEMPOOL_SIZE_MB * 1'000'000};
+    size_t max_size_bytes{DEFAULT_MAX_MEMPOOL_SIZE};
     std::chrono::seconds expiry{std::chrono::hours{DEFAULT_MEMPOOL_EXPIRY_HOURS}};
     CFeeRate incremental_relay_feerate{DEFAULT_INCREMENTAL_RELAY_FEE};
     /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
