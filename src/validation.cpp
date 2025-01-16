@@ -49,6 +49,7 @@
 #include <txmempool.h>
 #include <uint256.h>
 #include <undo.h>
+#include <util/byte_units.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
@@ -2798,15 +2799,17 @@ CoinsCacheSizeState Chainstate::GetCoinsCacheSizeState(
     size_t max_mempool_size_bytes)
 {
     AssertLockHeld(::cs_main);
-    const int64_t nMempoolUsage = m_mempool ? m_mempool->DynamicMemoryUsage() : 0;
-    int64_t cacheSize = CoinsTip().DynamicMemoryUsage();
-    int64_t nTotalSpace =
-        max_coins_cache_size_bytes + std::max<int64_t>(int64_t(max_mempool_size_bytes) - nMempoolUsage, 0);
+    const size_t nMempoolUsage{m_mempool ? m_mempool->DynamicMemoryUsage() : 0};
+    const size_t cacheSize{CoinsTip().DynamicMemoryUsage()};
+    size_t nTotalSpace{max_coins_cache_size_bytes};
+    if (max_mempool_size_bytes > nMempoolUsage) {
+        nTotalSpace += max_mempool_size_bytes - nMempoolUsage;
+    }
 
     //! No need to periodic flush if at least this much space still available.
-    static constexpr int64_t MAX_BLOCK_COINSDB_USAGE_BYTES = 10 * 1024 * 1024;  // 10MB
-    int64_t large_threshold =
-        std::max((9 * nTotalSpace) / 10, nTotalSpace - MAX_BLOCK_COINSDB_USAGE_BYTES);
+    static constexpr size_t MAX_BLOCK_COINSDB_USAGE_BYTES = 10_MiB;
+    size_t large_threshold =
+        std::max((nTotalSpace / 10) * 9, nTotalSpace - MAX_BLOCK_COINSDB_USAGE_BYTES);
 
     if (cacheSize > nTotalSpace) {
         LogPrintf("Cache size (%s) exceeds total space (%s)\n", cacheSize, nTotalSpace);
