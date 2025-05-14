@@ -135,7 +135,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const std::span<T> coins)
     Assert(coins.size() == tx.vin.size());
     auto input_it = tx.vin.begin();
     for (auto it = coins.begin(); it != coins.end(); ++it, ++input_it) {
-        const Coin& coin{*it};
+        const Coin& coin = *it;
         assert(!coin.IsSpent());
         const CTxOut &prevout = coin.out;
         if (prevout.scriptPubKey.IsPayToScriptHash())
@@ -165,7 +165,7 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const std::span<T> coins
     Assert(coins.size() == tx.vin.size());
     auto input_it = tx.vin.begin();
     for (auto it = coins.begin(); it != coins.end(); ++it, ++input_it) {
-        const Coin& coin{*it};
+        const Coin& coin = *it;
         assert(!coin.IsSpent());
         const CTxOut &prevout = coin.out;
         nSigOps += CountWitnessSigOps(input_it->scriptSig, prevout.scriptPubKey, &input_it->scriptWitness, flags);
@@ -185,7 +185,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
     Assert(coins.size() == tx.vin.size());
     auto input_it = tx.vin.begin();
     for (auto it = coins.begin(); it != coins.end(); ++it, ++input_it) {
-        const Coin& coin{*it};
+        const Coin& coin = *it;
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
