@@ -988,6 +988,7 @@ std::optional<BlockIndex> ChainstateManager::GetNextBlockIndex(const BlockIndex&
 
     if (!next_block_index) {
         LogTrace(BCLog::KERNEL, "The block index is the tip of the current chain, it does not have a next.");
+        return std::nullopt;
     }
 
     return std::make_optional<BlockIndex>(std::make_unique<BlockIndex::BlockIndexImpl>(*next_block_index));
