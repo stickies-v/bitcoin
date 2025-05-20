@@ -144,6 +144,12 @@ BlockUndo* cast_block_undo(kernel_BlockUndo* undo)
     return reinterpret_cast<BlockUndo*>(undo);
 }
 
+Logger* cast_logger(kernel_LoggingConnection* logging_connection)
+{
+    assert(logging_connection);
+    return reinterpret_cast<Logger*>(logging_connection);
+}
+
 class CallbackKernelNotifications : public KernelNotifications
 {
 private:
@@ -310,6 +316,13 @@ kernel_LoggingConnection* kernel_logging_connection_create(kernel_LogCallback ca
 {
     auto logger = new Logger([callback, user_data](std::string_view message) { callback(user_data, message.data(), message.length()); }, options);
     return reinterpret_cast<kernel_LoggingConnection*>(logger);
+}
+
+void kernel_logging_connection_destroy(kernel_LoggingConnection* logging_connection)
+{
+    if (logging_connection) {
+        delete cast_logger(logging_connection);
+    }
 }
 
 kernel_ChainParameters* kernel_chain_parameters_create(const kernel_ChainType chain_type)
