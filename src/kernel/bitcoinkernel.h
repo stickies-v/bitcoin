@@ -621,7 +621,7 @@ BITCOINKERNEL_API void kernel_disable_log_category(const kernel_LogCategory cate
  */
 BITCOINKERNEL_API kernel_LoggingConnection* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_logging_connection_create(
     kernel_LogCallback callback,
-    const void* user_data,
+    void* user_data,
     const kernel_LoggingOptions options
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
