@@ -278,8 +278,11 @@ bool kernel_verify_script(const kernel_ScriptPubkey* script_pubkey_,
     const auto& script_pubkey{*cast_script_pubkey(script_pubkey_)};
     const auto& tx{*cast_transaction(tx_to)};
 
-    const TransactionOutput* first_output{reinterpret_cast<const TransactionOutput*>(*spent_outputs_)};
-    std::span<const TransactionOutput> spent_outputs{first_output, spent_outputs_len};
+    std::span<const TransactionOutput> spent_outputs;
+    if (spent_outputs_ != nullptr) {
+        const TransactionOutput* first_output{reinterpret_cast<const TransactionOutput*>(*spent_outputs_)};
+        spent_outputs = {first_output, spent_outputs_len};
+    }
 
     return script_pubkey.VerifyScript(
                         amount,
