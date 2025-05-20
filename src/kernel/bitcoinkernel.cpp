@@ -181,6 +181,7 @@ ScriptPubkey::~ScriptPubkey() = default;
 
 struct Transaction::TransactionImpl {
     CTransaction m_transaction;
+    TransactionImpl(CTransaction&& tx) : m_transaction{std::move(tx)} {}
 };
 
 Transaction::Transaction(std::span<const unsigned char> raw_transaction) noexcept
