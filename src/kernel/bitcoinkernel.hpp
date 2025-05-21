@@ -17,6 +17,11 @@
 #include <string_view>
 #include <vector>
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4251) // Suppress C4251 for STL members (e.g. std::unique_ptr) in exported classes
+#endif
+
 namespace kernel_header {
 
 class TransactionOutput;
@@ -372,5 +377,9 @@ public:
 };
 
 } // namespace kernel_header
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // BITCOIN_KERNEL_BITCOINKERNEL_WRAPPER_H
