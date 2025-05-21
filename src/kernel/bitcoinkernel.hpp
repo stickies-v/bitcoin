@@ -23,7 +23,7 @@ class TransactionOutput;
 class Context;
 class ContextOptions;
 
-class Transaction
+class BITCOINKERNEL_API Transaction
 {
 private:
     struct TransactionImpl;
@@ -39,7 +39,7 @@ public:
     friend class ScriptPubkey;
 };
 
-class ScriptPubkey
+class BITCOINKERNEL_API ScriptPubkey
 {
 private:
     struct ScriptPubkeyImpl;
@@ -68,7 +68,7 @@ public:
     friend class TransactionOutput;
 };
 
-class TransactionOutput
+class BITCOINKERNEL_API TransactionOutput
 {
 private:
     struct TransactionOutputImpl;
@@ -101,7 +101,7 @@ void DisableLogCategory(const kernel_LogCategory category);
 
 void DisableLogging();
 
-class Logger
+class BITCOINKERNEL_API Logger
 {
 private:
     struct LoggerImpl;
@@ -115,7 +115,7 @@ public:
     explicit operator bool() const noexcept { return bool{m_impl}; }
 };
 
-class BlockIndex
+class BITCOINKERNEL_API BlockIndex
 {
 private:
     struct BlockIndexImpl;
@@ -142,7 +142,7 @@ public:
     friend class ChainstateManager;
 };
 
-class KernelNotifications
+class BITCOINKERNEL_API KernelNotifications
 {
 private:
     struct KernelNotificationsImpl;
@@ -170,7 +170,7 @@ public:
     friend class ChainstateManagerOptions;
 };
 
-class ChainParameters
+class BITCOINKERNEL_API ChainParameters
 {
 private:
     struct ChainParametersImpl;
@@ -183,7 +183,7 @@ public:
     friend class ContextOptions;
 };
 
-class UnownedBlock
+class BITCOINKERNEL_API UnownedBlock
 {
 private:
 	struct UnownedBlockImpl;
@@ -200,7 +200,7 @@ public:
     kernel_BlockHash GetHash() const noexcept;
 };
 
-class BlockValidationState
+class BITCOINKERNEL_API BlockValidationState
 {
 private:
 	struct BlockValidationStateImpl;
@@ -216,7 +216,7 @@ public:
 	friend class ValidationInterface;
 };
 
-class ValidationInterface
+class BITCOINKERNEL_API ValidationInterface
 {
 private:
 	struct ValidationInterfaceImpl;
@@ -231,7 +231,7 @@ public:
 	friend class Context;
 };
 
-class ContextOptions
+class BITCOINKERNEL_API ContextOptions
 {
 private:
     struct ContextOptionsImpl;
@@ -250,7 +250,7 @@ public:
     friend class Context;
 };
 
-class Context
+class BITCOINKERNEL_API Context
 {
 private:
     struct ContextImpl;
@@ -270,7 +270,7 @@ public:
     friend class ChainstateManager;
 };
 
-class ChainstateManagerOptions
+class BITCOINKERNEL_API ChainstateManagerOptions
 {
 private:
     struct ChainstateManagerOptionsImpl;
@@ -294,7 +294,7 @@ public:
     friend class ChainstateManager;
 };
 
-class Block
+class BITCOINKERNEL_API Block
 {
 private:
     struct BlockImpl;
@@ -317,7 +317,7 @@ public:
     friend class ChainstateManager;
 };
 
-class BlockUndo
+class BITCOINKERNEL_API BlockUndo
 {
 private:
     struct BlockUndoImpl;
@@ -338,7 +338,7 @@ public:
     friend class ChainstateManager;
 };
 
-class ChainstateManager
+class BITCOINKERNEL_API ChainstateManager
 {
 private:
     struct ChainstateManagerImpl;
