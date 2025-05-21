@@ -8,10 +8,17 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <exception>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 using kernel_header::Block;
 using kernel_header::BlockIndex;

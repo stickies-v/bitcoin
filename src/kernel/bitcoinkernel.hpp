@@ -7,11 +7,15 @@
 
 #include <kernel/bitcoinkernel.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
-#include <string_view>
 #include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace kernel_header {
 

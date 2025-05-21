@@ -9,8 +9,10 @@
 #include <kernel/bitcoinkernel.h>
 
 #include <chain.h>
+#include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
+#include <dbwrapper.h>
 #include <kernel/caches.h>
 #include <kernel/chainparams.h>
 #include <kernel/chainstatemanager_opts.h>
@@ -33,14 +35,16 @@
 #include <util/fs.h>
 #include <util/result.h>
 #include <util/signalinterrupt.h>
-#include <util/translation.h>
 #include <util/task_runner.h>
+#include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>
 
+#include <cassert>
 #include <cstring>
 #include <exception>
 #include <functional>
+#include <list>
 #include <span>
 #include <string>
 #include <tuple>
