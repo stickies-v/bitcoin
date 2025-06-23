@@ -55,7 +55,7 @@ bool TestLockPointValidity(CChain& active_chain, const LockPoints& lp)
 }
 
 void CTxMemPool::UpdateForDescendants(txiter updateIt, cacheMap& cachedDescendants,
-                                      const std::set<uint256>& setExclude, std::set<uint256>& descendants_to_remove)
+                                      const std::set<uint256>& setExclude, std::set<Txid>& descendants_to_remove)
 {
     CTxMemPoolEntry::Children stageEntries, descendants;
     stageEntries = updateIt->GetMemPoolChildrenConst();
@@ -117,7 +117,7 @@ void CTxMemPool::UpdateTransactionsFromBlock(const std::vector<uint256>& vHashes
     // accounted for in the state of their ancestors)
     std::set<uint256> setAlreadyIncluded(vHashesToUpdate.begin(), vHashesToUpdate.end());
 
-    std::set<uint256> descendants_to_remove;
+    std::set<Txid> descendants_to_remove;
 
     // Iterate in reverse, so that whenever we are looking at a transaction
     // we are sure that all in-mempool descendants have already been processed.
@@ -984,9 +984,9 @@ const CTransaction* CTxMemPool::GetConflictTx(const COutPoint& prevout) const
     return it == mapNextTx.end() ? nullptr : it->second;
 }
 
-std::optional<CTxMemPool::txiter> CTxMemPool::GetIter(const uint256& txid) const
+std::optional<CTxMemPool::txiter> CTxMemPool::GetIter(const Txid& txid) const
 {
-    auto it = mapTx.find(txid);
+    auto it = mapTx.find(txid.ToUint256());
     if (it != mapTx.end()) return it;
     return std::nullopt;
 }
@@ -1007,7 +1007,7 @@ std::vector<CTxMemPool::txiter> CTxMemPool::GetIterVec(const std::vector<uint256
     std::vector<txiter> ret;
     ret.reserve(txids.size());
     for (const auto& txid : txids) {
-        const auto it{GetIter(txid)};
+        const auto it{GetIter(Txid::FromUint256(txid))};
         if (!it) return {};
         ret.push_back(*it);
     }

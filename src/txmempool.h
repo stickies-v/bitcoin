@@ -498,7 +498,7 @@ public:
     const CTransaction* GetConflictTx(const COutPoint& prevout) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
     /** Returns an iterator to the given hash, if found */
-    std::optional<txiter> GetIter(const uint256& txid) const EXCLUSIVE_LOCKS_REQUIRED(cs);
+    std::optional<txiter> GetIter(const Txid& txid) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
     /** Translate a set of hashes into a set of pool iterators to avoid repeated lookups.
      * Does not require that all of the hashes correspond to actual transactions in the mempool,
@@ -750,7 +750,7 @@ private:
      *     removeRecursive them.
      */
     void UpdateForDescendants(txiter updateIt, cacheMap& cachedDescendants,
-                              const std::set<uint256>& setExclude, std::set<uint256>& descendants_to_remove) EXCLUSIVE_LOCKS_REQUIRED(cs);
+                              const std::set<uint256>& setExclude, std::set<Txid>& descendants_to_remove) EXCLUSIVE_LOCKS_REQUIRED(cs);
     /** Update ancestors of hash to add/remove it as a descendant transaction. */
     void UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors) EXCLUSIVE_LOCKS_REQUIRED(cs);
     /** Set ancestor state for an entry */
