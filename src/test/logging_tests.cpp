@@ -278,7 +278,7 @@ BOOST_FIXTURE_TEST_CASE(logging_Conf, LogSetup)
 
 BOOST_AUTO_TEST_CASE(logging_sourcelocation_counter)
 {
-    BCLog::SourceLocationCounter counter;
+    BCLog::SourceLocationCounter counter{BCLog::RATELIMIT_MAX_BYTES};
 
     // Check that counter gets initialized correctly.
     BOOST_CHECK_EQUAL(counter.GetAvailableBytes(), BCLog::RATELIMIT_MAX_BYTES);

@@ -113,11 +113,12 @@ namespace BCLog {
     {
     private:
         //! Remaining bytes in the current window interval.
-        uint64_t m_available_bytes{RATELIMIT_MAX_BYTES};
+        uint64_t m_available_bytes;
         //! Number of bytes that were not consumed within the current window.
         uint64_t m_dropped_bytes{0};
 
     public:
+        SourceLocationCounter(uint64_t max_bytes) : m_available_bytes{max_bytes} {}
         //! Consume bytes from the window if enough bytes are available.
         //!
         //! Returns whether or not enough bytes were available.
@@ -148,9 +149,11 @@ namespace BCLog {
         std::atomic<bool> m_suppression_active{false};
 
     public:
-        LogRateLimiter(CScheduler& scheduler);
+        LogRateLimiter(CScheduler& scheduler, uint64_t max_bytes, std::chrono::seconds reset_window);
+        //! Maximum number of bytes logged per location per window.
+        const uint64_t m_max_bytes;
         //! Interval after which the window is reset.
-        static constexpr std::chrono::hours WINDOW_SIZE{1};
+        const std::chrono::seconds m_reset_window;
         //! Suppression status of a source log location.
         enum class Status {
             UNSUPPRESSED,     // string fits within the limit

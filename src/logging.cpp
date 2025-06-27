@@ -368,9 +368,12 @@ static size_t MemUsage(const BCLog::Logger::BufferedLog& buflog)
     return buflog.str.size() + buflog.logging_function.size() + buflog.source_file.size() + buflog.threadname.size() + memusage::MallocUsage(sizeof(memusage::list_node<BCLog::Logger::BufferedLog>));
 }
 
-BCLog::LogRateLimiter::LogRateLimiter(CScheduler& scheduler)
+BCLog::LogRateLimiter::LogRateLimiter(
+    CScheduler& scheduler,
+    uint64_t max_bytes,
+    std::chrono::seconds reset_window) : m_max_bytes{max_bytes}, m_reset_window{reset_window}
 {
-    scheduler.scheduleEvery([this] { this->Reset(); }, WINDOW_SIZE);
+    scheduler.scheduleEvery([this] { this->Reset(); }, reset_window);
 }
 
 BCLog::LogRateLimiter::Status BCLog::LogRateLimiter::Consume(
@@ -378,7 +381,7 @@ BCLog::LogRateLimiter::Status BCLog::LogRateLimiter::Consume(
     const std::string& str)
 {
     StdLockGuard scoped_lock(m_mutex);
-    auto& counter{m_source_locations.try_emplace(source_loc).first->second};
+    auto& counter{m_source_locations.try_emplace(source_loc, m_max_bytes).first->second};
     Status status{counter.GetDroppedBytes() > 0 ? Status::STILL_SUPPRESSED : Status::UNSUPPRESSED};
 
     if (!counter.Consume(str.size()) && status == Status::UNSUPPRESSED) {
@@ -530,7 +533,7 @@ void BCLog::LogRateLimiter::Reset()
             "Restarting logging from %s:%d (%s): (%d MiB) were dropped during the last %ss.\n",
             source_loc.file_name(), source_loc.line(), source_loc.function_name(),
             dropped_bytes / (1024 * 1024),
-            Ticks<std::chrono::seconds>(WINDOW_SIZE));
+            Ticks<std::chrono::seconds>(m_reset_window));
     }
 }
 
