@@ -151,11 +151,21 @@ namespace BCLog {
         LogRateLimiter(CScheduler& scheduler);
         //! Interval after which the window is reset.
         static constexpr std::chrono::hours WINDOW_SIZE{1};
+        //! Suppression status of a source log location.
+        enum class Status {
+            UNSUPPRESSED,     // string fits within the limit
+            NEWLY_SUPPRESSED, // suppression has started since this string
+            STILL_SUPPRESSED, // suppression is still ongoing
+        };
         //! Consumes `source_loc`'s available bytes corresponding to the size of the (formatted)
-        //! `str` and returns true if it exceeds the rate limit allowance in the current time window.
-        bool NeedsRateLimiting(const std::source_location& source_loc, std::string& str) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+        //! `str` and returns its status.
+        [[nodiscard]] Status Consume(
+            const std::source_location& source_loc,
+            const std::string& str) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
         //! Resets all usage to zero. Should be called periodically, e.g. by a scheduler.
         void Reset() EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+        //! Returns true if any log locations are currently being suppressed.
+        bool SuppressionsActive() const { return m_suppression_active; }
     };
 
     class Logger

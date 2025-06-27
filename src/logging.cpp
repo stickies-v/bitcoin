@@ -373,32 +373,20 @@ BCLog::LogRateLimiter::LogRateLimiter(CScheduler& scheduler)
     scheduler.scheduleEvery([this] { this->Reset(); }, WINDOW_SIZE);
 }
 
-bool BCLog::LogRateLimiter::NeedsRateLimiting(const std::source_location& source_loc, std::string& str)
+BCLog::LogRateLimiter::Status BCLog::LogRateLimiter::Consume(
+    const std::source_location& source_loc,
+    const std::string& str)
 {
     StdLockGuard scoped_lock(m_mutex);
     auto& counter{m_source_locations.try_emplace(source_loc).first->second};
-    bool was_ratelimited{counter.GetDroppedBytes() > 0};
+    Status status{counter.GetDroppedBytes() > 0 ? Status::STILL_SUPPRESSED : Status::UNSUPPRESSED};
 
-    bool is_ratelimited{!counter.Consume(str.size())};
-
-    if (is_ratelimited && !was_ratelimited) {
-        // Logging from this source location will be suppressed until the current window resets.
+    if (!counter.Consume(str.size()) && status == Status::UNSUPPRESSED) {
+        status = Status::NEWLY_SUPPRESSED;
         m_suppression_active = true;
-
-        str.insert(0, strprintf("Excessive logging detected from %s:%d (%s): >%d MiB logged during the last hour. "
-                                "Suppressing logging to disk from this source location for up to one hour. "
-                                "Console logging unaffected. Last log entry.\n",
-                                source_loc.file_name(), source_loc.line(), source_loc.function_name(),
-                                RATELIMIT_MAX_BYTES / (1024 * 1024)));
     }
 
-    // To avoid confusion caused by dropped log messages when debugging an issue,
-    // we prefix log lines with "[*]" when there are any suppressed source locations.
-    if (m_suppression_active) {
-        str.insert(0, "[*] ");
-    }
-
-    return was_ratelimited && is_ratelimited;
+    return status;
 }
 
 void BCLog::Logger::FormatLogStrInPlace(std::string& str, BCLog::LogFlags category, BCLog::Level level, std::string_view source_file, int source_line, std::string_view logging_function, std::string_view threadname, SystemClock::time_point now, std::chrono::seconds mocktime) const
