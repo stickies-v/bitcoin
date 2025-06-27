@@ -370,16 +370,17 @@ static size_t MemUsage(const BCLog::Logger::BufferedLog& buflog)
 bool BCLog::LogRateLimiter::NeedsRateLimiting(const std::source_location& source_loc, std::string& str)
 {
     // Check to see if we were rate limited before calling MaybeResetWindow.
-    bool was_ratelimited{m_suppressed_locations.contains(source_loc)};
+    auto& counter{m_source_locations.try_emplace(source_loc).first->second};
+    bool was_ratelimited{counter.GetDroppedBytes() > 0};
 
     // If the window has elapsed, then we need to clear the unordered map and set.
     MaybeResetWindow(str);
 
-    bool is_ratelimited{!m_source_locations[source_loc].Consume(str.size())};
+    bool is_ratelimited{!counter.Consume(str.size())};
 
     if (is_ratelimited && !was_ratelimited) {
         // Logging from this source location will be suppressed until the current window resets.
-        m_suppressed_locations.insert(source_loc);
+        m_suppression_active = true;
 
         str.insert(0, strprintf("Excessive logging detected from %s:%d (%s): >%d MiB logged during the last hour. "
                                 "Suppressing logging to disk from this source location for up to one hour. "
@@ -390,7 +391,7 @@ bool BCLog::LogRateLimiter::NeedsRateLimiting(const std::source_location& source
 
     // To avoid confusion caused by dropped log messages when debugging an issue,
     // we prefix log lines with "[*]" when there are any suppressed source locations.
-    if (m_suppressed_locations.size() > 0) {
+    if (m_suppression_active) {
         str.insert(0, "[*] ");
     }
 
@@ -528,19 +529,20 @@ void BCLog::LogRateLimiter::MaybeResetWindow(std::string& str)
     if ((now - m_last_reset) >= WINDOW_SIZE) {
         m_last_reset = now;
 
-        // Iterate through m_suppressed_locations and log that we're resetting the window for each
-        // suppressed location.
-        for (const auto& source_loc : m_suppressed_locations) {
-            uint64_t dropped_bytes = m_source_locations[source_loc].GetDroppedBytes();
+        decltype(m_source_locations) source_locations;
+        {
+            source_locations.swap(m_source_locations);
+            m_suppression_active = false;
+        }
 
+        for (const auto& [source_loc, counter] : source_locations) {
+            uint64_t dropped_bytes{counter.GetDroppedBytes()};
+            if (dropped_bytes == 0) continue;
             str.insert(0, strprintf("Restarting logging from %s:%d (%s): "
                                     "(%d MiB) were dropped during the last hour.\n",
                                     source_loc.file_name(), source_loc.line(), source_loc.function_name(),
                                     dropped_bytes / (1024 * 1024)));
         }
-
-        m_source_locations.clear();
-        m_suppressed_locations.clear();
     }
 }
 

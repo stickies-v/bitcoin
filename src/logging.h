@@ -145,11 +145,11 @@ namespace BCLog {
 
         //! Counters for each source location that has attempted to log something.
         std::unordered_map<std::source_location, SourceLocationCounter, SourceLocationHasher, SourceLocationEqual> m_source_locations;
-        //! Set of source file locations that were dropped on the last log attempt.
-        std::unordered_set<std::source_location, SourceLocationHasher, SourceLocationEqual> m_suppressed_locations;
+        //! True if at least one log location is suppressed. Cached view on m_source_locations for performance reasons.
+        std::atomic<bool> m_suppression_active{false};
 
         //! Attempts to reset the logging window if the window interval has passed. This will clear
-        //! m_source_locations and m_suppressed_locations if a reset occurs.
+        //! m_source_locations and reset m_suppression_active if a reset occurs.
         void MaybeResetWindow(std::string&);
 
     public:
