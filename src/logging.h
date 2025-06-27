@@ -25,6 +25,8 @@
 #include <unordered_set>
 #include <vector>
 
+class CScheduler;
+
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
@@ -134,34 +136,26 @@ namespace BCLog {
 
     /**
      * Fixed window rate limiter for logging.
-     *
-     * This class is not thread-safe.
      */
     class LogRateLimiter
     {
     private:
-        //! Timestamp of the last window reset.
-        std::chrono::time_point<NodeClock> m_last_reset;
+        mutable StdMutex m_mutex;
 
         //! Counters for each source location that has attempted to log something.
-        std::unordered_map<std::source_location, SourceLocationCounter, SourceLocationHasher, SourceLocationEqual> m_source_locations;
+        std::unordered_map<std::source_location, SourceLocationCounter, SourceLocationHasher, SourceLocationEqual> m_source_locations GUARDED_BY(m_mutex);
         //! True if at least one log location is suppressed. Cached view on m_source_locations for performance reasons.
         std::atomic<bool> m_suppression_active{false};
 
-        //! Attempts to reset the logging window if the window interval has passed. This will clear
-        //! m_source_locations and reset m_suppression_active if a reset occurs.
-        void MaybeResetWindow(std::string&);
-
     public:
+        LogRateLimiter(CScheduler& scheduler);
         //! Interval after which the window is reset.
         static constexpr std::chrono::hours WINDOW_SIZE{1};
         //! Consumes `source_loc`'s available bytes corresponding to the size of the (formatted)
         //! `str` and returns true if it exceeds the rate limit allowance in the current time window.
-        bool NeedsRateLimiting(const std::source_location& source_loc, std::string& str);
-
-        LogRateLimiter() : m_last_reset{NodeClock::now()} {}
-
-        friend class Logger;
+        bool NeedsRateLimiting(const std::source_location& source_loc, std::string& str) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+        //! Resets all usage to zero. Should be called periodically, e.g. by a scheduler.
+        void Reset() EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
     };
 
     class Logger

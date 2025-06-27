@@ -5,6 +5,7 @@
 
 #include <logging.h>
 #include <memusage.h>
+#include <scheduler.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/string.h>
@@ -367,14 +368,16 @@ static size_t MemUsage(const BCLog::Logger::BufferedLog& buflog)
     return buflog.str.size() + buflog.logging_function.size() + buflog.source_file.size() + buflog.threadname.size() + memusage::MallocUsage(sizeof(memusage::list_node<BCLog::Logger::BufferedLog>));
 }
 
+BCLog::LogRateLimiter::LogRateLimiter(CScheduler& scheduler)
+{
+    scheduler.scheduleEvery([this] { this->Reset(); }, WINDOW_SIZE);
+}
+
 bool BCLog::LogRateLimiter::NeedsRateLimiting(const std::source_location& source_loc, std::string& str)
 {
-    // Check to see if we were rate limited before calling MaybeResetWindow.
+    StdLockGuard scoped_lock(m_mutex);
     auto& counter{m_source_locations.try_emplace(source_loc).first->second};
     bool was_ratelimited{counter.GetDroppedBytes() > 0};
-
-    // If the window has elapsed, then we need to clear the unordered map and set.
-    MaybeResetWindow(str);
 
     bool is_ratelimited{!counter.Consume(str.size())};
 
@@ -523,26 +526,23 @@ void BCLog::Logger::ShrinkDebugFile()
         fclose(file);
 }
 
-void BCLog::LogRateLimiter::MaybeResetWindow(std::string& str)
+void BCLog::LogRateLimiter::Reset()
 {
-    const auto now{NodeClock::now()};
-    if ((now - m_last_reset) >= WINDOW_SIZE) {
-        m_last_reset = now;
-
-        decltype(m_source_locations) source_locations;
-        {
-            source_locations.swap(m_source_locations);
-            m_suppression_active = false;
-        }
-
-        for (const auto& [source_loc, counter] : source_locations) {
-            uint64_t dropped_bytes{counter.GetDroppedBytes()};
-            if (dropped_bytes == 0) continue;
-            str.insert(0, strprintf("Restarting logging from %s:%d (%s): "
-                                    "(%d MiB) were dropped during the last hour.\n",
-                                    source_loc.file_name(), source_loc.line(), source_loc.function_name(),
-                                    dropped_bytes / (1024 * 1024)));
-        }
+    decltype(m_source_locations) source_locations;
+    {
+        StdLockGuard scoped_lock(m_mutex);
+        source_locations.swap(m_source_locations);
+        m_suppression_active = false;
+    }
+    for (const auto& [source_loc, counter] : source_locations) {
+        uint64_t dropped_bytes{counter.GetDroppedBytes()};
+        if (dropped_bytes == 0) continue;
+        LogPrintLevel_(
+            LogFlags::ALL, Level::Info,
+            "Restarting logging from %s:%d (%s): (%d MiB) were dropped during the last %ss.\n",
+            source_loc.file_name(), source_loc.line(), source_loc.function_name(),
+            dropped_bytes / (1024 * 1024),
+            Ticks<std::chrono::seconds>(WINDOW_SIZE));
     }
 }
 
