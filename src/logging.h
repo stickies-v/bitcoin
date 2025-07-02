@@ -25,8 +25,6 @@
 #include <unordered_set>
 #include <vector>
 
-class CScheduler;
-
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
@@ -149,7 +147,16 @@ namespace BCLog {
         std::atomic<bool> m_suppression_active{false};
 
     public:
-        LogRateLimiter(CScheduler& scheduler, uint64_t max_bytes, std::chrono::seconds reset_window);
+        using SchedulerFunction = std::function<void(std::function<void()>, std::chrono::milliseconds)>;
+        /**
+         * @param scheduler_func    Callable object used to schedule resetting the window. The first
+         *                          parameter is the function to be executed, and the second is the
+         *                          reset_window interval.
+         * @param max_bytes         Maximum number of bytes that can be logged for each source
+         *                          location.
+         * @param reset_window      Time window after which the byte counters are reset.
+         */
+        LogRateLimiter(SchedulerFunction scheduler_func, uint64_t max_bytes, std::chrono::seconds reset_window);
         //! Maximum number of bytes logged per location per window.
         const uint64_t m_max_bytes;
         //! Interval after which the window is reset.
@@ -165,7 +172,7 @@ namespace BCLog {
         [[nodiscard]] Status Consume(
             const std::source_location& source_loc,
             const std::string& str) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
-        //! Resets all usage to zero. Should be called periodically, e.g. by a scheduler.
+        //! Resets all usage to zero. Called periodically by the scheduler.
         void Reset() EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
         //! Returns true if any log locations are currently being suppressed.
         bool SuppressionsActive() const { return m_suppression_active; }

@@ -294,36 +294,22 @@ BOOST_FIXTURE_TEST_CASE(logging_Conf, LogSetup)
     }
 }
 
-//! Helper class instantiate and cleanup scheduler, and to facilitate
-//! mocking the time.
-class LogScheduler
+void MockForwardAndSync(CScheduler& scheduler, std::chrono::seconds duration)
 {
-private:
-    std::thread m_scheduler_thread;
-
-public:
-    CScheduler m_scheduler{};
-    void MockForwardAndSync(std::chrono::seconds duration)
-    {
-        m_scheduler.MockForward(duration);
-        std::promise<void> promise;
-        m_scheduler.scheduleFromNow([&promise] { promise.set_value(); }, 0ms);
-        promise.get_future().wait();
-    }
-    LogScheduler() : m_scheduler_thread{[&] { m_scheduler.serviceQueue(); }} {}
-    ~LogScheduler()
-    {
-        m_scheduler.stop();
-        m_scheduler_thread.join();
-    }
-};
+    scheduler.MockForward(duration);
+    std::promise<void> promise;
+    scheduler.scheduleFromNow([&promise] { promise.set_value(); }, 0ms);
+    promise.get_future().wait();
+}
 
 BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
 {
-    LogScheduler log_scheduler;
+    CScheduler scheduler{};
+    scheduler.m_service_thread = std::thread([&scheduler] { scheduler.serviceQueue(); });
     uint64_t max_bytes{1024};
     auto reset_window{1min};
-    BCLog::LogRateLimiter limiter{log_scheduler.m_scheduler, max_bytes, reset_window};
+    auto sched_func = [&scheduler](auto func, auto window) { scheduler.scheduleEvery(std::move(func), window); };
+    BCLog::LogRateLimiter limiter{sched_func, max_bytes, reset_window};
 
     using Status = BCLog::LogRateLimiter::Status;
     auto source_loc_1{std::source_location::current()};
@@ -351,11 +337,13 @@ BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
     BOOST_CHECK(limiter.SuppressionsActive());
 
     // After reset_window time has passed, all suppressions should be cleared.
-    log_scheduler.MockForwardAndSync(reset_window);
+    MockForwardAndSync(scheduler, reset_window);
 
     BOOST_CHECK(!limiter.SuppressionsActive());
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string{"a", max_bytes}), Status::UNSUPPRESSED);
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string{"a", max_bytes}), Status::UNSUPPRESSED);
+
+    scheduler.stop();
 }
 
 BOOST_AUTO_TEST_CASE(logging_log_limit_stats)

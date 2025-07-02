@@ -5,7 +5,6 @@
 
 #include <logging.h>
 #include <memusage.h>
-#include <scheduler.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/string.h>
@@ -373,11 +372,11 @@ static size_t MemUsage(const BCLog::Logger::BufferedLog& buflog)
 }
 
 BCLog::LogRateLimiter::LogRateLimiter(
-    CScheduler& scheduler,
+    SchedulerFunction scheduler_func,
     uint64_t max_bytes,
     std::chrono::seconds reset_window) : m_max_bytes{max_bytes}, m_reset_window{reset_window}
 {
-    scheduler.scheduleEvery([this] { this->Reset(); }, reset_window);
+    scheduler_func([this] { Reset(); }, reset_window);
 }
 
 BCLog::LogRateLimiter::Status BCLog::LogRateLimiter::Consume(
