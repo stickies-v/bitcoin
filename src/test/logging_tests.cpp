@@ -323,25 +323,25 @@ BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
     BOOST_CHECK(!limiter.SuppressionsActive());
 
     // No suppression should happen until more than max_bytes have been consumed
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string{"a", max_bytes - 1}), Status::UNSUPPRESSED);
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string(max_bytes - 1, 'a')), Status::UNSUPPRESSED);
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, "a"), Status::UNSUPPRESSED);
     BOOST_CHECK(!limiter.SuppressionsActive());
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, "a"), Status::NEWLY_SUPPRESSED);
     BOOST_CHECK(limiter.SuppressionsActive());
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string{"a", 1}), Status::STILL_SUPPRESSED);
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, "a"), Status::STILL_SUPPRESSED);
     BOOST_CHECK(limiter.SuppressionsActive());
 
-    // Location2  should not be affected by location 1's suppression
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string{"a", max_bytes}), Status::UNSUPPRESSED);
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string{"a", 1}), Status::NEWLY_SUPPRESSED);
+    // Location 2  should not be affected by location 1's suppression
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string(max_bytes, 'a')), Status::UNSUPPRESSED);
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, "a"), Status::NEWLY_SUPPRESSED);
     BOOST_CHECK(limiter.SuppressionsActive());
 
     // After reset_window time has passed, all suppressions should be cleared.
     MockForwardAndSync(scheduler, reset_window);
 
     BOOST_CHECK(!limiter.SuppressionsActive());
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string{"a", max_bytes}), Status::UNSUPPRESSED);
-    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string{"a", max_bytes}), Status::UNSUPPRESSED);
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string(max_bytes, 'a')), Status::UNSUPPRESSED);
+    BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string(max_bytes, 'a')), Status::UNSUPPRESSED);
 
     scheduler.stop();
 }
