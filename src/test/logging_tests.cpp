@@ -402,10 +402,10 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     bool prev_log_threadnames = LogInstance().m_log_threadnames;
     LogInstance().m_log_threadnames = false;
 
-    LogScheduler scheduler{};
-    uint64_t max_bytes{1024 * 1024};
-    auto reset_window{20s};
-    auto limiter = std::make_unique<BCLog::LogRateLimiter>(scheduler.m_scheduler, max_bytes, reset_window);
+    CScheduler scheduler{};
+    scheduler.m_service_thread = std::thread([&] { scheduler.serviceQueue(); });
+    auto sched_func = [&scheduler](auto func, auto window) { scheduler.scheduleEvery(std::move(func), window); };
+    auto limiter = std::make_unique<BCLog::LogRateLimiter>(sched_func, 1024 * 1024, 20s);
     LogInstance().SetRateLimiting(std::move(limiter));
 
     // Log 1024-character lines (1023 plus newline) to make the math simple.
@@ -441,7 +441,7 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     log_file_size = GetFileSize(log_path);
     {
         ASSERT_DEBUG_LOG("Restarting logging");
-        scheduler.MockForwardAndSync(1min);
+        MockForwardAndSync(scheduler, 1min);
     }
 
     // BOOST_CHECK_NO_THROW(LogFromLocationAndExpect(0, log_message, "Restarting logging"));
@@ -468,6 +468,7 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     LogInstance().m_log_timestamps = prev_log_timestamps;
     LogInstance().m_log_sourcelocations = prev_log_sourcelocations;
     LogInstance().m_log_threadnames = prev_log_threadnames;
+    scheduler.stop();
     LogInstance().SetRateLimiting(nullptr);
 }
 
