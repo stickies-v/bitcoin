@@ -105,12 +105,12 @@ BOOST_FIXTURE_TEST_CASE(logging_LogPrintStr, LogSetup)
     };
 
     std::vector<Case> cases = {
-        {"foo1: bar1", BCLog::NET,  BCLog::Level::Debug, "[net] ",      std::source_location::current()},
-        {"foo2: bar2", BCLog::NET,  BCLog::Level::Info,  "[net:info] ", std::source_location::current()},
-        {"foo3: bar3", BCLog::ALL,  BCLog::Level::Debug, "[debug] ",    std::source_location::current()},
-        {"foo4: bar4", BCLog::ALL,  BCLog::Level::Info,  "",            std::source_location::current()},
-        {"foo5: bar5", BCLog::NONE, BCLog::Level::Debug, "[debug] ",    std::source_location::current()},
-        {"foo6: bar6", BCLog::NONE, BCLog::Level::Info,  "",            std::source_location::current()},
+        {"foo1: bar1", BCLog::NET, BCLog::Level::Debug, "[net] ", std::source_location::current()},
+        {"foo2: bar2", BCLog::NET, BCLog::Level::Info, "[net:info] ", std::source_location::current()},
+        {"foo3: bar3", BCLog::ALL, BCLog::Level::Debug, "[debug] ", std::source_location::current()},
+        {"foo4: bar4", BCLog::ALL, BCLog::Level::Info, "", std::source_location::current()},
+        {"foo5: bar5", BCLog::NONE, BCLog::Level::Debug, "[debug] ", std::source_location::current()},
+        {"foo6: bar6", BCLog::NONE, BCLog::Level::Info, "", std::source_location::current()},
     };
 
     std::vector<std::string> expected;
