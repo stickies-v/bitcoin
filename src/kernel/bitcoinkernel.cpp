@@ -396,18 +396,11 @@ const CBlockIndex* cast_const_block_index(const kernel_BlockIndex* index)
     return reinterpret_cast<const CBlockIndex*>(index);
 }
 
-const CBlockUndo* cast_const_block_undo(const kernel_BlockUndo* undo)
+const std::shared_ptr<CBlockUndo>* cast_const_block_undo(const kernel_BlockUndo* undo)
 {
     assert(undo);
-    return reinterpret_cast<const CBlockUndo*>(undo);
+    return reinterpret_cast<const std::shared_ptr<CBlockUndo>*>(undo);
 }
-
-CBlockUndo* cast_block_undo(kernel_BlockUndo* undo)
-{
-    assert(undo);
-    return reinterpret_cast<CBlockUndo*>(undo);
-}
-
 
 } // namespace
 
@@ -993,12 +986,13 @@ kernel_BlockUndo* kernel_block_undo_read(const kernel_Context* context_,
         LogDebug(BCLog::KERNEL, "The genesis block does not have undo data.");
         return nullptr;
     }
-    auto block_undo{new CBlockUndo{}};
+    auto block_undo{std::make_unique<CBlockUndo>()};
     if (!chainman->m_blockman.ReadBlockUndo(*block_undo, *block_index)) {
         LogError("Failed to read block undo data.");
         return nullptr;
     }
-    return reinterpret_cast<kernel_BlockUndo*>(block_undo);
+    auto* handle{new std::shared_ptr<CBlockUndo>(std::move(block_undo))};
+    return reinterpret_cast<kernel_BlockUndo*>(handle);
 }
 
 void kernel_block_index_destroy(kernel_BlockIndex* block_index)
@@ -1009,20 +1003,20 @@ void kernel_block_index_destroy(kernel_BlockIndex* block_index)
 
 uint64_t kernel_block_undo_size(const kernel_BlockUndo* block_undo_)
 {
-    const auto block_undo{cast_const_block_undo(block_undo_)};
+    const auto& block_undo{*cast_const_block_undo(block_undo_)};
     return block_undo->vtxundo.size();
 }
 
 void kernel_block_undo_destroy(kernel_BlockUndo* block_undo)
 {
     if (block_undo) {
-        delete cast_block_undo(block_undo);
+        delete cast_const_block_undo(block_undo);
     }
 }
 
 uint64_t kernel_block_undo_get_transaction_undo_size(const kernel_BlockUndo* block_undo_, uint64_t transaction_undo_index)
 {
-    const auto block_undo{cast_const_block_undo(block_undo_)};
+    const auto& block_undo{*cast_const_block_undo(block_undo_)};
     if (transaction_undo_index >= block_undo->vtxundo.size()) {
         LogInfo("transaction undo index is out of bounds.");
         return 0;
@@ -1032,7 +1026,7 @@ uint64_t kernel_block_undo_get_transaction_undo_size(const kernel_BlockUndo* blo
 
 uint32_t kernel_block_undo_get_transaction_output_height_by_index(const kernel_BlockUndo* block_undo_, uint64_t transaction_undo_index, uint64_t output_index)
 {
-    const auto block_undo{cast_const_block_undo(block_undo_)};
+    const auto block_undo{*cast_const_block_undo(block_undo_)};
 
     if (transaction_undo_index >= block_undo->vtxundo.size()) {
         LogInfo("transaction undo index is out of bounds.");
@@ -1053,7 +1047,7 @@ kernel_TransactionOutput* kernel_block_undo_copy_transaction_output_by_index(con
                                                           uint64_t transaction_undo_index,
                                                           uint64_t output_index)
 {
-    const auto block_undo{cast_const_block_undo(block_undo_)};
+    const auto block_undo{*cast_const_block_undo(block_undo_)};
 
     if (transaction_undo_index >= block_undo->vtxundo.size()) {
         LogInfo("transaction undo index is out of bounds.");

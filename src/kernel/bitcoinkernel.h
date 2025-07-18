@@ -1087,7 +1087,8 @@ BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT ker
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * Destroy the block undo data.
+ * Destroy the block undo data. Handle is invalidated immediately, block is destroyed as soon as no
+ * references remain.
  */
 BITCOINKERNEL_API void kernel_block_undo_destroy(kernel_BlockUndo* block_undo);
 
