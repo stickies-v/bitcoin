@@ -544,22 +544,18 @@ void chainman_regtest_validation_test()
 
     auto block_undo{chainman->ReadBlockUndo(tip)};
     assert(block_undo);
-    assert(block_undo->GetTxOutSize(block_undo->m_size) == 0);
-    auto tx_undo_size = block_undo->GetTxOutSize(block_undo->m_size - 1);
-    auto output = block_undo->GetTxUndoPrevoutByIndex(block_undo->m_size - 1, tx_undo_size - 1);
-    uint32_t output_height = block_undo->GetTxUndoPrevoutHeight(block_undo->m_size - 1, tx_undo_size - 1);
-    assert(output_height == 205);
+    assert(block_undo->GetTxUndo(block_undo->m_size)->m_size == 0);
+    auto tx_undo = block_undo->GetTxUndo(block_undo->m_size - 1);
+    block_undo.reset(); // ensure tx_undo remains valid when the kernel_BlockUndo from which it was created is destroyed
+    assert(tx_undo);
+    auto output = tx_undo->GetOutput(tx_undo->m_size - 1);
     assert(output);
-    assert(output.GetOutputAmount() == 100000000);
-    auto script_pubkey = output.GetScriptPubkey();
+    auto output_height = tx_undo->GetOutputHeight(tx_undo->m_size - 1);
+    assert(output_height == 205);
+    assert(output->GetOutputAmount() == 100000000);
+    auto script_pubkey = output->GetScriptPubkey();
     assert(script_pubkey);
     assert(script_pubkey.GetScriptPubkeyData().size() == 22);
-
-    // Test that reading past the size returns null data
-    output = block_undo->GetTxUndoPrevoutByIndex(block_undo->m_size, tx_undo_size);
-    assert(!output);
-    output_height = block_undo->GetTxUndoPrevoutHeight(block_undo->m_size, tx_undo_size);
-    assert(!output_height);
 }
 
 void chainman_reindex_test(TestDirectory& test_directory)

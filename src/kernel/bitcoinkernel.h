@@ -227,6 +227,13 @@ typedef struct kernel_BlockValidationState kernel_BlockValidationState;
  */
 typedef struct kernel_BlockUndo kernel_BlockUndo;
 
+/**
+ * Opaque data structure for holding transaction undo data.
+ *
+ * It holds all the previous outputs consumed by a specific transaction.
+ */
+typedef struct kernel_TransactionUndo kernel_TransactionUndo;
+
 /** Current sync state passed to tip changed callbacks. */
 typedef enum {
     kernel_INIT_REINDEX,
@@ -1042,55 +1049,78 @@ BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_undo_si
  * @brief Returns the number of previous transaction outputs contained in the
  * transaction undo data.
  *
- * @param[in] block_undo             Non-null, the block undo data from which tx_undo was retrieved from.
- * @param[in] transaction_undo_index The index of the transaction undo data within the block undo data.
- * @return                           The number of previous transaction outputs in the transaction,
- *                                   or 0 if the provided index is out of bounds.
+ * @param[in] transaction_undo       Non-null.
+ * @return                           The number of previous transaction outputs in the transaction.
  */
-BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_undo_get_transaction_undo_size(
+BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_size(
+    const kernel_TransactionUndo* transaction_undo) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * @brief Returns a transaction undo data contained in the block undo data at a
+ * certain index. This value is copied from the underlying data and thus owned
+ * entirely by the user.
+ *
+ * @param[in] block_undo             Non-null.
+ * @param[in] transaction_undo_index The index of the transaction undo data within the block undo data.
+ * @return                           A transaction undo pointer, or null if provided indices are out of bounds.
+ */
+BITCOINKERNEL_API kernel_TransactionUndo* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_undo_get_transaction_undo(
     const kernel_BlockUndo* block_undo,
-    uint64_t transaction_undo_index
-) BITCOINKERNEL_ARG_NONNULL(1);
+    uint64_t transaction_undo_index) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * Destroy the block undo data.
+ */
+BITCOINKERNEL_API void kernel_block_undo_destroy(kernel_BlockUndo* block_undo);
+
+///@}
+
+/** @name TransactionUndo
+ * Functions for working with transaction undo data.
+ */
+///@{
+
+/**
+ * @brief Returns the number of previous transaction outputs contained in the
+ * transaction undo data.
+ *
+ * @param[in] transaction_undo Non-null, the transaction undo data.
+ * @return                     The number of previous transaction outputs in the transaction.
+ */
+BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_get_size(
+    const kernel_TransactionUndo* transaction_undo) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Returns the block height of the block that contains the output at
- * output_index within the transaction undo data at the provided index of the
- * block undo data.
+ * output_index within the transaction undo data.
  *
- * @param[in] block_undo             Non-null.
- * @param[in] transaction_undo_index The index of the transaction undo data within the block undo data.
- * @param[in] output_index           The index of the targeted transaction output within the transaction
- *                                   undo data.
- * @return                           The block height of the output, or 0 if provided indices are out of bounds.
+ * @param[in] transaction_undo Non-null.
+ * @param[in] output_index     The index of the targeted transaction output within the transaction
+ *                             undo data.
+ * @return                     The block height of the output, or 0 if provided indices are out of bounds.
  */
-BITCOINKERNEL_API uint32_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_undo_get_transaction_output_height_by_index(
-    const kernel_BlockUndo* block_undo,
-    uint64_t transaction_undo_index,
-    uint64_t output_index
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API uint32_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_get_output_height_by_index(
+    const kernel_TransactionUndo* transaction_undo,
+    uint64_t output_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Return a transaction output contained in the transaction undo data
- * of a block undo data at a certain index. This value is copied from the
- * underlying data and thus owned entirely by the user.
+ * @brief Return a transaction output contained in the transaction undo data at
+ * a certain index. This value is copied from the underlying data and thus owned
+ * entirely by the user.
  *
- * @param[in] block_undo             Non-null.
- * @param[in] transaction_undo_index The index of the transaction undo data within the block undo data.
- * @param[in] output_index           The index of the to be retrieved transaction output within the
- *                                   transaction undo data.
- * @return                           A transaction output pointer, or null if provided indices are out of bounds.
+ * @param[in] transaction_undo Non-null.
+ * @param[in] output_index     The index of the to be retrieved transaction output within the
+ *                             transaction undo data.
+ * @return                     A transaction output pointer, or null if provided indices are out of bounds.
  */
-BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_undo_copy_transaction_output_by_index(
-    const kernel_BlockUndo* block_undo,
-    uint64_t transaction_undo_index,
-    uint64_t output_index
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_copy_output_by_index(
+    const kernel_TransactionUndo* transaction_undo,
+    uint64_t output_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * Destroy the block undo data. Handle is invalidated immediately, block is destroyed as soon as no
- * references remain.
+ * Destroy the transaction undo data.
  */
-BITCOINKERNEL_API void kernel_block_undo_destroy(kernel_BlockUndo* block_undo);
+BITCOINKERNEL_API void kernel_transaction_undo_destroy(kernel_TransactionUndo* transaction_undo);
 
 ///@}
 

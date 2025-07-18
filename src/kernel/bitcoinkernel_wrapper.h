@@ -446,6 +446,43 @@ public:
     friend class ChainMan;
 };
 
+class TransactionUndo
+{
+private:
+    struct Deleter {
+        void operator()(kernel_TransactionUndo* ptr) const
+        {
+            kernel_transaction_undo_destroy(ptr);
+        }
+    };
+
+    std::unique_ptr<kernel_TransactionUndo, Deleter> m_transaction_undo;
+
+public:
+    const uint64_t m_size;
+
+    /** Check whether this TransactionUndo object is valid. */
+    explicit operator bool() const noexcept { return bool{m_transaction_undo}; }
+
+    TransactionUndo(kernel_TransactionUndo* tx_undo) noexcept
+        : m_transaction_undo{tx_undo},
+          m_size{kernel_transaction_undo_get_size(tx_undo)}
+    {
+    }
+
+    std::optional<uint32_t> GetOutputHeight(uint64_t index) const noexcept
+    {
+        auto height{kernel_transaction_undo_get_output_height_by_index(m_transaction_undo.get(), index)};
+        return height > 0 ? std::make_optional<uint32_t>(height) : std::nullopt;
+    }
+
+    std::optional<TransactionOutput> GetOutput(uint64_t index) const noexcept
+    {
+        auto output{kernel_transaction_undo_copy_output_by_index(m_transaction_undo.get(), index)};
+        return output ? std::make_optional<TransactionOutput>(output) : std::nullopt;
+    }
+};
+
 class BlockUndo
 {
 private:
@@ -470,23 +507,10 @@ public:
     BlockUndo(const BlockUndo&) = delete;
     BlockUndo& operator=(const BlockUndo&) = delete;
 
-    uint64_t GetTxOutSize(uint64_t index) const noexcept
+    std::optional<TransactionUndo> GetTxUndo(uint64_t tx_undo_index) const noexcept
     {
-        return kernel_block_undo_get_transaction_undo_size(m_block_undo.get(), index);
-    }
-
-    uint32_t GetTxUndoPrevoutHeight(
-        uint64_t tx_undo_index,
-        uint64_t tx_prevout_index) const noexcept
-    {
-        return kernel_block_undo_get_transaction_output_height_by_index(m_block_undo.get(), tx_undo_index, tx_prevout_index);
-    }
-
-    TransactionOutput GetTxUndoPrevoutByIndex(
-        uint64_t tx_undo_index,
-        uint64_t tx_prevout_index) const noexcept
-    {
-        return TransactionOutput{kernel_block_undo_copy_transaction_output_by_index(m_block_undo.get(), tx_undo_index, tx_prevout_index)};
+        auto tx_undo{kernel_block_undo_get_transaction_undo(m_block_undo.get(), tx_undo_index)};
+        return tx_undo ? std::make_optional<TransactionUndo>(tx_undo) : std::nullopt;
     }
 };
 

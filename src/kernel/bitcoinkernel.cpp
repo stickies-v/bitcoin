@@ -402,6 +402,13 @@ const std::shared_ptr<CBlockUndo>* cast_const_block_undo(const kernel_BlockUndo*
     return reinterpret_cast<const std::shared_ptr<CBlockUndo>*>(undo);
 }
 
+const std::shared_ptr<const CTxUndo>* cast_const_transaction_undo(const kernel_TransactionUndo* undo)
+{
+    assert(undo);
+    return reinterpret_cast<const std::shared_ptr<const CTxUndo>*>(undo);
+}
+
+
 } // namespace
 
 kernel_Transaction* kernel_transaction_create(const unsigned char* raw_transaction, size_t raw_transaction_len)
@@ -1014,54 +1021,59 @@ void kernel_block_undo_destroy(kernel_BlockUndo* block_undo)
     }
 }
 
-uint64_t kernel_block_undo_get_transaction_undo_size(const kernel_BlockUndo* block_undo_, uint64_t transaction_undo_index)
+uint64_t kernel_transaction_undo_size(const kernel_TransactionUndo* transaction_undo_)
 {
-    const auto& block_undo{*cast_const_block_undo(block_undo_)};
-    if (transaction_undo_index >= block_undo->vtxundo.size()) {
-        LogInfo("transaction undo index is out of bounds.");
-        return 0;
-    }
-    return block_undo->vtxundo[transaction_undo_index].vprevout.size();
+    const auto& transaction_undo{*cast_const_transaction_undo(transaction_undo_)};
+    return transaction_undo->vprevout.size();
 }
 
-uint32_t kernel_block_undo_get_transaction_output_height_by_index(const kernel_BlockUndo* block_undo_, uint64_t transaction_undo_index, uint64_t output_index)
+kernel_TransactionUndo* kernel_block_undo_get_transaction_undo(const kernel_BlockUndo* block_undo_, uint64_t transaction_undo_index)
 {
     const auto block_undo{*cast_const_block_undo(block_undo_)};
-
-    if (transaction_undo_index >= block_undo->vtxundo.size()) {
-        LogInfo("transaction undo index is out of bounds.");
-        return 0;
-    }
-
-    const auto& tx_undo = block_undo->vtxundo[transaction_undo_index];
-
-    if (output_index >= tx_undo.vprevout.size()) {
-        LogInfo("previous output index is out of bounds.");
-        return 0;
-    }
-
-    return tx_undo.vprevout[output_index].nHeight;
-}
-
-kernel_TransactionOutput* kernel_block_undo_copy_transaction_output_by_index(const kernel_BlockUndo* block_undo_,
-                                                          uint64_t transaction_undo_index,
-                                                          uint64_t output_index)
-{
-    const auto block_undo{*cast_const_block_undo(block_undo_)};
-
     if (transaction_undo_index >= block_undo->vtxundo.size()) {
         LogInfo("transaction undo index is out of bounds.");
         return nullptr;
     }
+    const auto* tx_undo{&block_undo->vtxundo.at(transaction_undo_index)};
+    auto handle{new std::shared_ptr<const CTxUndo>(block_undo, tx_undo)};
+    return reinterpret_cast<kernel_TransactionUndo*>(handle);
+}
 
-    const auto& tx_undo = block_undo->vtxundo[transaction_undo_index];
+uint64_t kernel_transaction_undo_get_size(const kernel_TransactionUndo* transaction_undo_)
+{
+    const auto& tx_undo{*cast_const_transaction_undo(transaction_undo_)};
+    return tx_undo->vprevout.size();
+}
 
-    if (output_index >= tx_undo.vprevout.size()) {
+void kernel_transaction_undo_destroy(kernel_TransactionUndo* transaction_undo)
+{
+    if (transaction_undo) {
+        delete cast_const_transaction_undo(transaction_undo);
+    }
+}
+
+uint32_t kernel_transaction_undo_get_output_height_by_index(const kernel_TransactionUndo* transaction_undo_, uint64_t output_index)
+{
+    const auto& tx_undo{*cast_const_transaction_undo(transaction_undo_)};
+
+    if (output_index >= tx_undo->vprevout.size()) {
+        LogInfo("previous output index is out of bounds.");
+        return 0;
+    }
+
+    return tx_undo->vprevout[output_index].nHeight;
+}
+
+kernel_TransactionOutput* kernel_transaction_undo_copy_output_by_index(const kernel_TransactionUndo* transaction_undo_, uint64_t output_index)
+{
+    const auto tx_undo{*cast_const_transaction_undo(transaction_undo_)};
+
+    if (output_index >= tx_undo->vprevout.size()) {
         LogInfo("previous output index is out of bounds.");
         return nullptr;
     }
 
-    CTxOut* prevout{new CTxOut{tx_undo.vprevout.at(output_index).out}};
+    CTxOut* prevout{new CTxOut{tx_undo->vprevout.at(output_index).out}};
     return reinterpret_cast<kernel_TransactionOutput*>(prevout);
 }
 
