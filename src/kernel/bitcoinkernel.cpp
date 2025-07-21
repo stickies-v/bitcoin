@@ -306,16 +306,16 @@ const CTransaction* cast_transaction(const kernel_Transaction* transaction)
     return reinterpret_cast<const CTransaction*>(transaction);
 }
 
-const CScript* cast_script_pubkey(const kernel_ScriptPubkey* script_pubkey)
+const std::shared_ptr<const CScript>* cast_const_script_pubkey(const kernel_ScriptPubkey* script_pubkey)
 {
     assert(script_pubkey);
-    return reinterpret_cast<const CScript*>(script_pubkey);
+    return reinterpret_cast<const std::shared_ptr<const CScript>*>(script_pubkey);
 }
 
-const CTxOut* cast_transaction_output(const kernel_TransactionOutput* transaction_output)
+const std::shared_ptr<const CTxOut>* cast_const_transaction_output(const kernel_TransactionOutput* transaction_output)
 {
     assert(transaction_output);
-    return reinterpret_cast<const CTxOut*>(transaction_output);
+    return reinterpret_cast<const std::shared_ptr<const CTxOut>*>(transaction_output);
 }
 
 const ContextOptions* cast_const_context_options(const kernel_ContextOptions* options)
@@ -436,13 +436,14 @@ void kernel_transaction_destroy(kernel_Transaction* transaction)
 
 kernel_ScriptPubkey* kernel_script_pubkey_create(const unsigned char* script_pubkey_, size_t script_pubkey_len)
 {
-    auto script_pubkey = new CScript(script_pubkey_, script_pubkey_ + script_pubkey_len);
-    return reinterpret_cast<kernel_ScriptPubkey*>(script_pubkey);
+    auto script_pubkey = std::make_shared<const CScript>(script_pubkey_, script_pubkey_ + script_pubkey_len);
+    auto* handle{new std::shared_ptr<const CScript>(script_pubkey)};
+    return reinterpret_cast<kernel_ScriptPubkey*>(handle);
 }
 
 kernel_ByteArray* kernel_script_pubkey_copy_data(const kernel_ScriptPubkey* script_pubkey_)
 {
-    auto script_pubkey{cast_script_pubkey(script_pubkey_)};
+    const auto& script_pubkey{*cast_const_script_pubkey(script_pubkey_)};
 
     auto byte_array{new kernel_ByteArray{
         .data = new unsigned char[script_pubkey->size()],
@@ -456,22 +457,23 @@ kernel_ByteArray* kernel_script_pubkey_copy_data(const kernel_ScriptPubkey* scri
 void kernel_script_pubkey_destroy(kernel_ScriptPubkey* script_pubkey)
 {
     if (script_pubkey) {
-        delete cast_script_pubkey(script_pubkey);
+        delete cast_const_script_pubkey(script_pubkey);
     }
 }
 
 kernel_TransactionOutput* kernel_transaction_output_create(const kernel_ScriptPubkey* script_pubkey_, int64_t amount)
 {
-    const auto& script_pubkey{*cast_script_pubkey(script_pubkey_)};
+    const auto& script_pubkey{*cast_const_script_pubkey(script_pubkey_)};
     const CAmount& value{amount};
-    auto tx_out{new CTxOut(value, script_pubkey)};
-    return reinterpret_cast<kernel_TransactionOutput*>(tx_out);
+    auto tx_out{std::make_shared<const CTxOut>(value, *script_pubkey)};
+    auto* handle{new std::shared_ptr<const CTxOut>(std::move(tx_out))};
+    return reinterpret_cast<kernel_TransactionOutput*>(handle);
 }
 
 void kernel_transaction_output_destroy(kernel_TransactionOutput* output)
 {
     if (output) {
-        delete cast_transaction_output(output);
+        delete cast_const_transaction_output(output);
     }
 }
 
@@ -484,7 +486,7 @@ bool kernel_verify_script(const kernel_ScriptPubkey* script_pubkey_,
                           kernel_ScriptVerifyStatus* status)
 {
     const CAmount amount{amount_};
-    const auto& script_pubkey{*cast_script_pubkey(script_pubkey_)};
+    const auto& script_pubkey{**cast_const_script_pubkey(script_pubkey_)};
 
     if (!verify_flags(flags)) {
         if (status) *status = kernel_SCRIPT_VERIFY_ERROR_INVALID_FLAGS;
@@ -510,8 +512,8 @@ bool kernel_verify_script(const kernel_ScriptPubkey* script_pubkey_,
         }
         spent_outputs.reserve(spent_outputs_len);
         for (size_t i = 0; i < spent_outputs_len; i++) {
-            const CTxOut& tx_out{*reinterpret_cast<const CTxOut*>(spent_outputs_[i])};
-            spent_outputs.push_back(tx_out);
+            const auto& tx_out{*cast_const_transaction_output(spent_outputs_[i])};
+            spent_outputs.push_back(*tx_out);
         }
     }
 
@@ -1083,11 +1085,12 @@ bool kernel_coin_is_coinbase(const kernel_Coin* coin_)
     return coin->IsCoinBase();
 }
 
-kernel_TransactionOutput* kernel_coin_copy_output(const kernel_Coin* coin_)
+kernel_TransactionOutput* kernel_coin_get_output(const kernel_Coin* coin_)
 {
-    const auto& coin{*cast_const_coin(coin_)};
-    CTxOut* output{new CTxOut{coin->out}};
-    return reinterpret_cast<kernel_TransactionOutput*>(output);
+    const auto coin{*cast_const_coin(coin_)};
+    const auto* output{&coin->out};
+    auto handle{new std::shared_ptr<const CTxOut>(coin, output)};
+    return reinterpret_cast<kernel_TransactionOutput*>(handle);
 }
 
 void kernel_coin_destroy(kernel_Coin* coin)
@@ -1097,16 +1100,17 @@ void kernel_coin_destroy(kernel_Coin* coin)
     }
 }
 
-kernel_ScriptPubkey* kernel_transaction_output_copy_script_pubkey(kernel_TransactionOutput* output_)
+kernel_ScriptPubkey* kernel_transaction_output_get_script_pubkey(kernel_TransactionOutput* output_)
 {
-    auto output{cast_transaction_output(output_)};
-    auto script_pubkey = new CScript{output->scriptPubKey};
-    return reinterpret_cast<kernel_ScriptPubkey*>(script_pubkey);
+    const auto& output = *cast_const_transaction_output(output_);
+    const CScript* script_pubkey = &output->scriptPubKey;
+    auto* handle = new std::shared_ptr<const CScript>(output, script_pubkey);
+    return reinterpret_cast<kernel_ScriptPubkey*>(handle);
 }
 
 int64_t kernel_transaction_output_get_amount(kernel_TransactionOutput* output_)
 {
-    auto output{cast_transaction_output(output_)};
+    const auto& output{*cast_const_transaction_output(output_)};
     return output->nValue;
 }
 

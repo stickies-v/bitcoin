@@ -553,9 +553,11 @@ void chainman_regtest_validation_test()
     assert(coin->GetConfirmationHeight() == 205);
     assert(!coin->IsCoinbase());
     auto output = coin->GetOutput();
+    coin.reset(); // ensure output remains valid when the kernel_Coin from which it was created is destroyed
     assert(output);
     assert(output->GetOutputAmount() == 100000000);
     auto script_pubkey = output->GetScriptPubkey();
+    output.reset(); // ensure script_pubkey remains valid when the kernel_TransactionOutput from which it was created is destroyed
     assert(script_pubkey);
     assert(script_pubkey.GetScriptPubkeyData().size() == 22);
 }

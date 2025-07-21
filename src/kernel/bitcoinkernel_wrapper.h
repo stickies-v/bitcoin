@@ -99,7 +99,7 @@ public:
 
     ScriptPubkey GetScriptPubkey() noexcept
     {
-        return kernel_transaction_output_copy_script_pubkey(m_transaction_output.get());
+        return kernel_transaction_output_get_script_pubkey(m_transaction_output.get());
     }
 
     int64_t GetOutputAmount() noexcept
@@ -469,7 +469,7 @@ public:
 
     std::optional<TransactionOutput> GetOutput() const noexcept
     {
-        auto output{kernel_coin_copy_output(m_coin.get())};
+        auto output{kernel_coin_get_output(m_coin.get())};
         return output ? std::make_optional<TransactionOutput>(output) : std::nullopt;
     }
 };

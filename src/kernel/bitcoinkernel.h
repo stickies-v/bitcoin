@@ -501,8 +501,7 @@ BITCOINKERNEL_API kernel_TransactionOutput* kernel_transaction_output_create(
  * @param[in] transaction_output Non-null.
  * @return                       The data for the output's script pubkey.
  */
-BITCOINKERNEL_API kernel_ScriptPubkey* kernel_transaction_output_copy_script_pubkey(kernel_TransactionOutput* transaction_output
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API kernel_ScriptPubkey* kernel_transaction_output_get_script_pubkey(kernel_TransactionOutput* transaction_output) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Gets the amount associated with this transaction output
@@ -1146,7 +1145,7 @@ BITCOINKERNEL_API bool BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_is_coinbase(
  * @param[in] coin Non-null.
  * @return         A transaction output pointer.
  */
-BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_copy_output(
+BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_get_output(
     const kernel_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
