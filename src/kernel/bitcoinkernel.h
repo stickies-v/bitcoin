@@ -106,6 +106,11 @@ extern "C" {
 typedef struct kernel_Transaction kernel_Transaction;
 
 /**
+ * Opaque data structure for holding a coin.
+ */
+typedef struct kernel_Coin kernel_Coin;
+
+/**
  * Opaque data structure for holding a script pubkey.
  */
 typedef struct kernel_ScriptPubkey kernel_ScriptPubkey;
@@ -1091,36 +1096,63 @@ BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_u
     const kernel_TransactionUndo* transaction_undo) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Returns the block height of the block that contains the output at
- * output_index within the transaction undo data.
- *
- * @param[in] transaction_undo Non-null.
- * @param[in] output_index     The index of the targeted transaction output within the transaction
- *                             undo data.
- * @return                     The block height of the output, or 0 if provided indices are out of bounds.
- */
-BITCOINKERNEL_API uint32_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_get_output_height_by_index(
-    const kernel_TransactionUndo* transaction_undo,
-    uint64_t output_index) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
- * @brief Return a transaction output contained in the transaction undo data at
+ * @brief Returns a coin contained in the transaction undo data at
  * a certain index. This value is copied from the underlying data and thus owned
  * entirely by the user.
  *
  * @param[in] transaction_undo Non-null.
- * @param[in] output_index     The index of the to be retrieved transaction output within the
+ * @param[in] coin_index       The index of the to be retrieved coin within the
  *                             transaction undo data.
- * @return                     A transaction output pointer, or null if provided indices are out of bounds.
+ * @return                     A coin pointer, or null if provided indices are out of bounds.
  */
-BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_copy_output_by_index(
+BITCOINKERNEL_API kernel_Coin* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_transaction_undo_get_coin_by_index(
     const kernel_TransactionUndo* transaction_undo,
-    uint64_t output_index) BITCOINKERNEL_ARG_NONNULL(1);
+    uint64_t coin_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * Destroy the transaction undo data.
  */
 BITCOINKERNEL_API void kernel_transaction_undo_destroy(kernel_TransactionUndo* transaction_undo);
+
+///@}
+
+/** @name Coin
+ * Functions for working with coins.
+ */
+///@{
+
+/**
+ * @brief Returns the height of the block that contains the coin's prevout.
+ *
+ * @param[in] coin Non-null.
+ * @return         The block height of the coin.
+ */
+BITCOINKERNEL_API uint32_t BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_get_confirmation_height(
+    const kernel_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * @brief Returns whether the containing transaction was a coinbase.
+ *
+ * @param[in] coin Non-null.
+ * @return         True if the coin is a coinbase coin, false otherwise.
+ */
+BITCOINKERNEL_API bool BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_is_coinbase(
+    const kernel_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * @brief Return the transaction output of a coin. This value is copied from the
+ * underlying data and thus owned entirely by the user.
+ *
+ * @param[in] coin Non-null.
+ * @return         A transaction output pointer.
+ */
+BITCOINKERNEL_API kernel_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_coin_copy_output(
+    const kernel_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * Destroy the coin.
+ */
+BITCOINKERNEL_API void kernel_coin_destroy(kernel_Coin* coin);
 
 ///@}
 

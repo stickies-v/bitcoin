@@ -544,14 +544,16 @@ void chainman_regtest_validation_test()
 
     auto block_undo{chainman->ReadBlockUndo(tip)};
     assert(block_undo);
-    assert(block_undo->GetTxUndo(block_undo->m_size)->m_size == 0);
     auto tx_undo = block_undo->GetTxUndo(block_undo->m_size - 1);
     block_undo.reset(); // ensure tx_undo remains valid when the kernel_BlockUndo from which it was created is destroyed
     assert(tx_undo);
-    auto output = tx_undo->GetOutput(tx_undo->m_size - 1);
+    auto coin = tx_undo->GetCoin(tx_undo->m_size - 1);
+    tx_undo.reset(); // ensure coin remains valid when the kernel_TransactionUndo from which it was created is destroyed
+    assert(coin);
+    assert(coin->GetConfirmationHeight() == 205);
+    assert(!coin->IsCoinbase());
+    auto output = coin->GetOutput();
     assert(output);
-    auto output_height = tx_undo->GetOutputHeight(tx_undo->m_size - 1);
-    assert(output_height == 205);
     assert(output->GetOutputAmount() == 100000000);
     auto script_pubkey = output->GetScriptPubkey();
     assert(script_pubkey);

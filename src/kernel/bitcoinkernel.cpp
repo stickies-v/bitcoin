@@ -408,6 +408,11 @@ const std::shared_ptr<const CTxUndo>* cast_const_transaction_undo(const kernel_T
     return reinterpret_cast<const std::shared_ptr<const CTxUndo>*>(undo);
 }
 
+const std::shared_ptr<const Coin>* cast_const_coin(const kernel_Coin* coin)
+{
+    assert(coin);
+    return reinterpret_cast<const std::shared_ptr<const Coin>*>(coin);
+}
 
 } // namespace
 
@@ -1052,29 +1057,44 @@ void kernel_transaction_undo_destroy(kernel_TransactionUndo* transaction_undo)
     }
 }
 
-uint32_t kernel_transaction_undo_get_output_height_by_index(const kernel_TransactionUndo* transaction_undo_, uint64_t output_index)
+kernel_Coin* kernel_transaction_undo_get_coin_by_index(const kernel_TransactionUndo* transaction_undo_, uint64_t coin_index)
 {
     const auto& tx_undo{*cast_const_transaction_undo(transaction_undo_)};
 
-    if (output_index >= tx_undo->vprevout.size()) {
-        LogInfo("previous output index is out of bounds.");
-        return 0;
-    }
-
-    return tx_undo->vprevout[output_index].nHeight;
-}
-
-kernel_TransactionOutput* kernel_transaction_undo_copy_output_by_index(const kernel_TransactionUndo* transaction_undo_, uint64_t output_index)
-{
-    const auto tx_undo{*cast_const_transaction_undo(transaction_undo_)};
-
-    if (output_index >= tx_undo->vprevout.size()) {
+    if (coin_index >= tx_undo->vprevout.size()) {
         LogInfo("previous output index is out of bounds.");
         return nullptr;
     }
 
-    CTxOut* prevout{new CTxOut{tx_undo->vprevout.at(output_index).out}};
-    return reinterpret_cast<kernel_TransactionOutput*>(prevout);
+    const auto* coin{&tx_undo->vprevout.at(coin_index)};
+    auto handle{new std::shared_ptr<const Coin>(tx_undo, coin)};
+    return reinterpret_cast<kernel_Coin*>(handle);
+}
+
+uint32_t kernel_coin_get_confirmation_height(const kernel_Coin* coin_)
+{
+    const auto& coin{*cast_const_coin(coin_)};
+    return coin->nHeight;
+}
+
+bool kernel_coin_is_coinbase(const kernel_Coin* coin_)
+{
+    const auto& coin{*cast_const_coin(coin_)};
+    return coin->IsCoinBase();
+}
+
+kernel_TransactionOutput* kernel_coin_copy_output(const kernel_Coin* coin_)
+{
+    const auto& coin{*cast_const_coin(coin_)};
+    CTxOut* output{new CTxOut{coin->out}};
+    return reinterpret_cast<kernel_TransactionOutput*>(output);
+}
+
+void kernel_coin_destroy(kernel_Coin* coin)
+{
+    if (coin) {
+        delete cast_const_coin(coin);
+    }
 }
 
 kernel_ScriptPubkey* kernel_transaction_output_copy_script_pubkey(kernel_TransactionOutput* output_)

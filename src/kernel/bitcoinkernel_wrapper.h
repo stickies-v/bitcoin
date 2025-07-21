@@ -446,6 +446,34 @@ public:
     friend class ChainMan;
 };
 
+class Coin
+{
+private:
+    struct Deleter {
+        void operator()(kernel_Coin* ptr) const
+        {
+            kernel_coin_destroy(ptr);
+        }
+    };
+
+    std::unique_ptr<kernel_Coin, Deleter> m_coin;
+
+public:
+    explicit operator bool() const noexcept { return bool{m_coin}; }
+
+    Coin(kernel_Coin* coin) noexcept : m_coin{coin} {}
+
+    uint32_t GetConfirmationHeight() const noexcept { return kernel_coin_get_confirmation_height(m_coin.get()); }
+
+    bool IsCoinbase() const noexcept { return kernel_coin_is_coinbase(m_coin.get()); }
+
+    std::optional<TransactionOutput> GetOutput() const noexcept
+    {
+        auto output{kernel_coin_copy_output(m_coin.get())};
+        return output ? std::make_optional<TransactionOutput>(output) : std::nullopt;
+    }
+};
+
 class TransactionUndo
 {
 private:
@@ -470,16 +498,10 @@ public:
     {
     }
 
-    std::optional<uint32_t> GetOutputHeight(uint64_t index) const noexcept
+    std::optional<Coin> GetCoin(uint64_t index) const noexcept
     {
-        auto height{kernel_transaction_undo_get_output_height_by_index(m_transaction_undo.get(), index)};
-        return height > 0 ? std::make_optional<uint32_t>(height) : std::nullopt;
-    }
-
-    std::optional<TransactionOutput> GetOutput(uint64_t index) const noexcept
-    {
-        auto output{kernel_transaction_undo_copy_output_by_index(m_transaction_undo.get(), index)};
-        return output ? std::make_optional<TransactionOutput>(output) : std::nullopt;
+        auto coin{kernel_transaction_undo_get_coin_by_index(m_transaction_undo.get(), index)};
+        return coin ? std::make_optional<Coin>(coin) : std::nullopt;
     }
 };
 
