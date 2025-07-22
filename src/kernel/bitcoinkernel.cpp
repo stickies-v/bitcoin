@@ -153,6 +153,29 @@ kernel_Warning cast_kernel_warning(kernel::Warning warning)
     assert(false);
 }
 
+} // namespace
+
+struct kernel_Block {
+    std::shared_ptr<const CBlock> block_ptr;
+
+    kernel_Block(std::shared_ptr<const CBlock> block) : block_ptr{block} {}
+    static kernel_Block* FromBytes(std::span<const unsigned char> bytes)
+    {
+        DataStream stream{bytes};
+        auto block{std::make_shared<CBlock>()};
+        try {
+            stream >> TX_WITH_WITNESS(*block);
+        } catch (const std::exception&) {
+            return nullptr;
+        }
+        return new kernel_Block{std::move(block)};
+    }
+
+    const CBlock& get() const { return *block_ptr; }
+};
+
+namespace {
+
 class KernelNotifications : public kernel::Notifications
 {
 private:
@@ -370,12 +393,6 @@ ChainstateManager* cast_chainstate_manager(kernel_ChainstateManager* chainman)
 {
     assert(chainman);
     return reinterpret_cast<ChainstateManager*>(chainman);
-}
-
-std::shared_ptr<CBlock>* cast_cblocksharedpointer(kernel_Block* block)
-{
-    assert(block);
-    return reinterpret_cast<std::shared_ptr<CBlock>*>(block);
 }
 
 const BlockValidationState* cast_block_validation_state(const kernel_BlockValidationState* block_validation_state)
@@ -887,19 +904,11 @@ bool kernel_chainstate_manager_import_blocks(const kernel_Context* context_,
 
 kernel_Block* kernel_block_create(const unsigned char* raw_block, size_t raw_block_length)
 {
-    auto block{new CBlock()};
-
-    DataStream stream{std::span{raw_block, raw_block_length}};
-
-    try {
-        stream >> TX_WITH_WITNESS(*block);
-    } catch (const std::exception&) {
-        delete block;
+    auto block{kernel_Block::FromBytes(std::span{raw_block, raw_block_length})};
+    if (!block) {
         LogDebug(BCLog::KERNEL, "Block decode failed.");
-        return nullptr;
     }
-
-    return reinterpret_cast<kernel_Block*>(new std::shared_ptr<CBlock>(block));
+    return block;
 }
 
 void kernel_byte_array_destroy(kernel_ByteArray* byte_array)
@@ -908,12 +917,10 @@ void kernel_byte_array_destroy(kernel_ByteArray* byte_array)
     if (byte_array) delete byte_array;
 }
 
-kernel_ByteArray* kernel_block_copy_data(kernel_Block* block_)
+kernel_ByteArray* kernel_block_copy_data(kernel_Block* block)
 {
-    auto block{cast_cblocksharedpointer(block_)};
-
     DataStream ss{};
-    ss << TX_WITH_WITNESS(**block);
+    ss << TX_WITH_WITNESS(block->get());
 
     auto byte_array{new kernel_ByteArray{
         .data = new unsigned char[ss.size()],
@@ -942,10 +949,9 @@ kernel_ByteArray* kernel_block_pointer_copy_data(const kernel_BlockPointer* bloc
     return byte_array;
 }
 
-kernel_BlockHash* kernel_block_get_hash(kernel_Block* block_)
+kernel_BlockHash* kernel_block_get_hash(kernel_Block* block)
 {
-    auto block{cast_cblocksharedpointer(block_)};
-    auto hash{(*block)->GetHash()};
+    auto hash{block->get().GetHash()};
     auto block_hash = new kernel_BlockHash{};
     std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
     return block_hash;
@@ -963,7 +969,7 @@ kernel_BlockHash* kernel_block_pointer_get_hash(const kernel_BlockPointer* block
 void kernel_block_destroy(kernel_Block* block)
 {
     if (block) {
-        delete cast_cblocksharedpointer(block);
+        delete block;
     }
 }
 
@@ -1038,12 +1044,12 @@ kernel_Block* kernel_block_read(const kernel_Context* context_,
     auto chainman{cast_chainstate_manager(chainman_)};
     const CBlockIndex* block_index{cast_const_block_index(block_index_)};
 
-    auto block{new std::shared_ptr<CBlock>(new CBlock{})};
-    if (!chainman->m_blockman.ReadBlock(**block, *block_index)) {
+    auto block = std::make_shared<CBlock>();
+    if (!chainman->m_blockman.ReadBlock(*block, *block_index)) {
         LogError("Failed to read block.");
         return nullptr;
     }
-    return reinterpret_cast<kernel_Block*>(block);
+    return new kernel_Block{std::move(block)};
 }
 
 kernel_BlockUndo* kernel_block_undo_read(const kernel_Context* context_,
@@ -1173,12 +1179,10 @@ int64_t kernel_transaction_output_get_amount(kernel_TransactionOutput* output_)
 bool kernel_chainstate_manager_process_block(
     const kernel_Context* context_,
     kernel_ChainstateManager* chainman_,
-    kernel_Block* block_,
+    kernel_Block* block,
     bool* new_block)
 {
     auto& chainman{*cast_chainstate_manager(chainman_)};
 
-    auto blockptr{cast_cblocksharedpointer(block_)};
-
-    return chainman.ProcessNewBlock(*blockptr, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/new_block);
+    return chainman.ProcessNewBlock(block->block_ptr, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/new_block);
 }
