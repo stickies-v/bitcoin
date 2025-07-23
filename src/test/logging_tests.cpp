@@ -311,7 +311,8 @@ BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
     BCLog::LogRateLimiter::SchedulerFunction sched_func{[&scheduler](std::function<void()> func, std::chrono::milliseconds window) {
         scheduler.scheduleEvery(std::move(func), window);
     }};
-    BCLog::LogRateLimiter limiter{sched_func, max_bytes, reset_window};
+    auto limiter_{BCLog::LogRateLimiter::Create(sched_func, max_bytes, reset_window)};
+    auto& limiter{*limiter_};
 
     using Status = BCLog::LogRateLimiter::Status;
     std::source_location source_loc_1{std::source_location::current()};
@@ -427,8 +428,7 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     BCLog::LogRateLimiter::SchedulerFunction sched_func{[&scheduler](std::function<void()> func, std::chrono::milliseconds window) {
         scheduler.scheduleEvery(std::move(func), window);
     }};
-    std::unique_ptr<BCLog::LogRateLimiter> limiter{std::make_unique<BCLog::LogRateLimiter>(sched_func, bytes_quota, time_window)};
-    LogInstance().SetRateLimiting(std::move(limiter));
+    LogInstance().SetRateLimiting(BCLog::LogRateLimiter::Create(sched_func, bytes_quota, time_window));
 
     std::string log_message(line_length, 'a');
 

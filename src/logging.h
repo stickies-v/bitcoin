@@ -18,6 +18,7 @@
 #include <cstring>
 #include <functional>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <source_location>
 #include <string>
@@ -107,7 +108,7 @@ namespace BCLog {
     constexpr uint64_t RATELIMIT_MAX_BYTES{1024 * 1024}; // maximum number of bytes per source location that can be logged within the specified time-window
 
     //! Fixed window rate limiter for logging.
-    class LogRateLimiter
+    class LogRateLimiter : public std::enable_shared_from_this<LogRateLimiter>
     {
     public:
         //! Keeps track of an individual source location and how many available bytes are left for logging from it.
@@ -129,6 +130,7 @@ namespace BCLog {
         std::unordered_map<std::source_location, Stats, SourceLocationHasher, SourceLocationEqual> m_source_locations GUARDED_BY(m_mutex);
         //! Whether any log locations are suppressed. Cached view on m_source_locations for performance reasons.
         std::atomic<bool> m_suppression_active{false};
+        LogRateLimiter(uint64_t max_bytes, std::chrono::seconds reset_window);
 
     public:
         using SchedulerFunction = std::function<void(std::function<void()>, std::chrono::milliseconds)>;
@@ -140,7 +142,10 @@ namespace BCLog {
          *                          location.
          * @param reset_window      Time window after which the stats are reset.
          */
-        LogRateLimiter(SchedulerFunction scheduler_func, uint64_t max_bytes, std::chrono::seconds reset_window);
+        static std::shared_ptr<LogRateLimiter> Create(
+            SchedulerFunction scheduler_func,
+            uint64_t max_bytes,
+            std::chrono::seconds reset_window);
         //! Maximum number of bytes logged per location per window.
         const uint64_t m_max_bytes;
         //! Interval after which the window is reset.
@@ -160,6 +165,8 @@ namespace BCLog {
         void Reset() EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
         //! Returns true if any log locations are currently being suppressed.
         bool SuppressionsActive() const { return m_suppression_active; }
+        //! The function that is used to schedule the reset window.
+        SchedulerFunction m_scheduler_func;
     };
 
     class Logger
@@ -185,7 +192,7 @@ namespace BCLog {
         size_t m_buffer_lines_discarded GUARDED_BY(m_cs){0};
 
         //! Manages the rate limiting of each log location.
-        std::unique_ptr<LogRateLimiter> m_limiter GUARDED_BY(m_cs);
+        std::shared_ptr<LogRateLimiter> m_limiter GUARDED_BY(m_cs);
 
         //! Category-specific log level. Overrides `m_log_level`.
         std::unordered_map<LogFlags, Level> m_category_log_levels GUARDED_BY(m_cs);
@@ -254,7 +261,7 @@ namespace BCLog {
         /** Only for testing */
         void DisconnectTestLogger() EXCLUSIVE_LOCKS_REQUIRED(!m_cs);
 
-        void SetRateLimiting(std::unique_ptr<LogRateLimiter>&& limiter) EXCLUSIVE_LOCKS_REQUIRED(!m_cs)
+        void SetRateLimiting(std::shared_ptr<LogRateLimiter> limiter) EXCLUSIVE_LOCKS_REQUIRED(!m_cs)
         {
             StdLockGuard scoped_lock(m_cs);
             m_limiter = std::move(limiter);
