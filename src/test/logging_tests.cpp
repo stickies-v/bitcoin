@@ -284,25 +284,40 @@ BOOST_FIXTURE_TEST_CASE(logging_Conf, LogSetup)
     }
 }
 
-void MockForwardAndSync(CScheduler& scheduler, std::chrono::seconds duration)
-{
-    scheduler.MockForward(duration);
-    std::promise<void> promise;
-    scheduler.scheduleFromNow([&promise] { promise.set_value(); }, 0ms);
-    promise.get_future().wait();
-}
+struct ScopedScheduler {
+    CScheduler scheduler{};
+
+    ScopedScheduler()
+    {
+        scheduler.m_service_thread = std::thread([this] { scheduler.serviceQueue(); });
+    }
+    ~ScopedScheduler()
+    {
+        scheduler.stop();
+    }
+    void MockForwardAndSync(std::chrono::seconds duration)
+    {
+        scheduler.MockForward(duration);
+        std::promise<void> promise;
+        scheduler.scheduleFromNow([&promise] { promise.set_value(); }, 0ms);
+        promise.get_future().wait();
+    }
+    std::shared_ptr<BCLog::LogRateLimiter> GetLimiter(size_t max_bytes, std::chrono::seconds window)
+    {
+        auto sched_func = [this](auto func, auto w) {
+            scheduler.scheduleEvery(std::move(func), w);
+        };
+        return BCLog::LogRateLimiter::Create(sched_func, max_bytes, window);
+    }
+};
 
 BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
 {
-    CScheduler scheduler{};
-    scheduler.m_service_thread = std::thread([&scheduler] { scheduler.serviceQueue(); });
     uint64_t max_bytes{1024};
     std::chrono::minutes reset_window{1};
-    BCLog::LogRateLimiter::SchedulerFunction sched_func{[&scheduler](std::function<void()> func, std::chrono::milliseconds window) {
-        scheduler.scheduleEvery(std::move(func), window);
-    }};
-    auto limiter_{BCLog::LogRateLimiter::Create(sched_func, max_bytes, reset_window)};
-    auto& limiter{*limiter_};
+    ScopedScheduler scheduler{};
+    auto limiter_{scheduler.GetLimiter(max_bytes, reset_window)};
+    auto& limiter{*Assert(limiter_)};
 
     using Status = BCLog::LogRateLimiter::Status;
     std::source_location source_loc_1{std::source_location::current()};
@@ -330,13 +345,11 @@ BOOST_AUTO_TEST_CASE(logging_log_rate_limiter)
     BOOST_CHECK(limiter.SuppressionsActive());
 
     // After reset_window time has passed, all suppressions should be cleared.
-    MockForwardAndSync(scheduler, reset_window);
+    scheduler.MockForwardAndSync(reset_window);
 
     BOOST_CHECK(!limiter.SuppressionsActive());
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_1, std::string(max_bytes, 'a')), Status::UNSUPPRESSED);
     BOOST_CHECK_EQUAL(limiter.Consume(source_loc_2, std::string(max_bytes, 'a')), Status::UNSUPPRESSED);
-
-    scheduler.stop();
 }
 
 BOOST_AUTO_TEST_CASE(logging_log_limit_stats)
@@ -365,117 +378,103 @@ BOOST_AUTO_TEST_CASE(logging_log_limit_stats)
 namespace {
 
 enum class Location {
-    FIRST,
-    SECOND,
-    THIRD,
-    FOURTH,
+    INFO_1,
+    INFO_2,
+    DEBUG,
+    INFO_NOLIMIT,
 };
 
 void LogFromLocation(Location location, const std::string& message) {
     switch (location) {
-    case Location::FIRST:
+    case Location::INFO_1:
         LogInfo("%s\n", message);
         return;
-    case Location::SECOND:
+    case Location::INFO_2:
         LogInfo("%s\n", message);
         return;
-    case Location::THIRD:
+    case Location::DEBUG:
         LogDebug(BCLog::LogFlags::HTTP, "%s\n", message);
         return;
-    case Location::FOURTH:
+    case Location::INFO_NOLIMIT:
         LogPrintLevel_(BCLog::LogFlags::ALL, BCLog::Level::Info, /*should_ratelimit=*/false, "%s\n", message);
         return;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
 
-void LogFromLocationAndExpect(Location location, const std::string& message, const std::string& expect) {
-    ASSERT_DEBUG_LOG(expect);
+/**
+ * For a given `location` and `message`, ensure that the on-disk debug log behaviour resembles what
+ * we'd expect it to be for `status` and `suppressions_active`.
+ */
+void TestLogFromLocation(Location location, const std::string& message,
+                         BCLog::LogRateLimiter::Status status, bool suppressions_active,
+                         std::source_location source = std::source_location::current())
+{
+    using Status = BCLog::LogRateLimiter::Status;
+    if (!suppressions_active) assert(status == Status::UNSUPPRESSED); // developer error
+
+    std::ofstream ofs(LogInstance().m_file_path, std::ios::out | std::ios::trunc); // clear debug log
     LogFromLocation(location, message);
+    auto log_lines{ReadDebugLogLines()};
+
+    BOOST_TEST_CONTEXT("TestLogFromLocation failed from " << source.file_name() << ":" << source.line())
+    {
+        if (status == Status::STILL_SUPPRESSED) {
+            BOOST_CHECK_EQUAL(log_lines.size(), 0);
+            return;
+        }
+
+        if (status == Status::NEWLY_SUPPRESSED) {
+            BOOST_REQUIRE_EQUAL(log_lines.size(), 2);
+            BOOST_CHECK(log_lines[0].starts_with("[*] [warning] Excessive logging detected"));
+            log_lines.erase(log_lines.begin());
+        }
+        BOOST_REQUIRE_EQUAL(log_lines.size(), 1);
+        auto& payload{log_lines.back()};
+        BOOST_CHECK_EQUAL(suppressions_active, payload.starts_with("[*]"));
+        BOOST_CHECK(payload.ends_with(message));
+    }
 }
 
 } // namespace
 
 BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
 {
-    bool prev_log_timestamps{LogInstance().m_log_timestamps};
+    using Status = BCLog::LogRateLimiter::Status;
     LogInstance().m_log_timestamps = false;
-    bool prev_log_sourcelocations{LogInstance().m_log_sourcelocations};
     LogInstance().m_log_sourcelocations = false;
-    bool prev_log_threadnames{LogInstance().m_log_threadnames};
     LogInstance().m_log_threadnames = false;
 
-    int64_t line_length{1023};
-    int64_t num_lines{1024};
+    constexpr int64_t line_length{1024};
+    constexpr int64_t num_lines{1024};
+    constexpr int64_t bytes_quota{line_length * num_lines};
+    constexpr auto time_window{20s};
 
-    // Add 1 to line_length because of newline.
-    int64_t bytes_quota{(line_length + 1) * num_lines};
+    ScopedScheduler scheduler{};
+    auto limiter{scheduler.GetLimiter(bytes_quota, time_window)};
+    LogInstance().SetRateLimiting(limiter);
 
-    std::chrono::seconds time_window{20};
+    const std::string log_message(line_length - 1, 'a'); // subtract one for newline
 
-    CScheduler scheduler{};
-    scheduler.m_service_thread = std::thread([&] { scheduler.serviceQueue(); });
-    BCLog::LogRateLimiter::SchedulerFunction sched_func{[&scheduler](std::function<void()> func, std::chrono::milliseconds window) {
-        scheduler.scheduleEvery(std::move(func), window);
-    }};
-    LogInstance().SetRateLimiting(BCLog::LogRateLimiter::Create(sched_func, bytes_quota, time_window));
-
-    std::string log_message(line_length, 'a');
-
-    std::string utf8_path{LogInstance().m_file_path.utf8string()};
-    const char* log_path{utf8_path.c_str()};
-
-    // Use GetFileSize because fs::file_size may require a flush to be accurate.
-    std::streamsize log_file_size{static_cast<std::streamsize>(GetFileSize(log_path))};
-
-    for (int64_t i{0}; i < num_lines; ++i) {
-        LogFromLocation(Location::FIRST, log_message);
+    for (int i = 0; i < num_lines; ++i) {
+        TestLogFromLocation(Location::INFO_1, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
     }
-    BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-    log_file_size = GetFileSize(log_path);
-    LogFromLocationAndExpect(Location::FIRST, log_message, "Excessive logging detected");
-    BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-    log_file_size = GetFileSize(log_path);
-    LogFromLocation(Location::FIRST, log_message);
-    BOOST_CHECK_EQUAL(log_file_size, GetFileSize(log_path));
-
-    log_file_size = GetFileSize(log_path);
-    LogFromLocation(Location::SECOND, log_message);
-    BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-    log_file_size = GetFileSize(log_path);
+    TestLogFromLocation(Location::INFO_1, "a", Status::NEWLY_SUPPRESSED, /*suppressions_active=*/true);
+    TestLogFromLocation(Location::INFO_1, "b", Status::STILL_SUPPRESSED, /*suppressions_active=*/true);
+    TestLogFromLocation(Location::INFO_2, "c", Status::UNSUPPRESSED, /*suppressions_active=*/true);
     {
-        ASSERT_DEBUG_LOG("Restarting logging");
-        MockForwardAndSync(scheduler, 1min);
+        scheduler.MockForwardAndSync(time_window);
+        BOOST_CHECK(ReadDebugLogLines().back().starts_with("[warning] Restarting logging"));
     }
-    BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-    // Check that Location::THIRD and Location::FOURTH are exempt from rate limiting.
-    for (Location location : {Location::THIRD, Location::FOURTH}) {
-        log_file_size = GetFileSize(log_path);
-        for (int64_t i{0}; i < num_lines; ++i) {
-            LogFromLocation(location, log_message);
+    // Check that logging from previously suppressed location is unsuppressed again.
+    TestLogFromLocation(Location::INFO_1, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
+    // Check that conditional logging, and unconditional logging with should_ratelimit=false is
+    // not being ratelimited.
+    for (Location location : {Location::DEBUG, Location::INFO_NOLIMIT}) {
+        for (int i = 0; i < num_lines + 2; ++i) {
+            TestLogFromLocation(location, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
         }
-        BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-        // Another log statement would normally trigger the rate limit and prevent any further logs.
-        log_file_size = GetFileSize(log_path);
-        LogFromLocation(location, log_message);
-        BOOST_CHECK(log_file_size < GetFileSize(log_path));
-
-        // Check that the rate limit is bypassed and the file size increases.
-        log_file_size = GetFileSize(log_path);
-        LogFromLocation(location, log_message);
-        BOOST_CHECK(log_file_size < GetFileSize(log_path));
     }
-
-    LogInstance().m_log_timestamps = prev_log_timestamps;
-    LogInstance().m_log_sourcelocations = prev_log_sourcelocations;
-    LogInstance().m_log_threadnames = prev_log_threadnames;
-    scheduler.stop();
-    LogInstance().SetRateLimiting(nullptr);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
