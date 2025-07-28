@@ -14,9 +14,9 @@
 #include <memory>
 
 struct TestSubscriber final : public CValidationInterface {
-    void BlockChecked(const CBlock& block, const BlockValidationState&) override
+    void BlockChecked(const std::shared_ptr<const CBlock>& block, const BlockValidationState&) override
     {
-        assert(!block.GetHash().IsNull());
+        assert(!block->GetHash().IsNull());
     }
 };
 
@@ -37,7 +37,7 @@ static void BlockChecked(benchmark::Bench& bench)
     }
     auto block{CreateBlock()};
     bench.run([&] {
-        signals.BlockChecked(*block, {});
+        signals.BlockChecked(block, {});
     });
 }
 
