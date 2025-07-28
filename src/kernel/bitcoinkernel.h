@@ -210,12 +210,6 @@ typedef struct kernel_ChainstateManager kernel_ChainstateManager;
 typedef struct kernel_Block kernel_Block;
 
 /**
- * Opaque data structure for holding a non-owned block. This is typically a
- * block available to the user through one of the validation callbacks.
- */
-typedef struct kernel_BlockPointer kernel_BlockPointer;
-
-/**
  * Opaque data structure for holding the state of a block during validation.
  *
  * Contains information indicating whether validation was successful, and if not
@@ -270,7 +264,7 @@ typedef void (*kernel_NotifyFatalError)(void* user_data, const char* message, si
 /**
  * Function signatures for the validation interface.
  */
-typedef void (*kernel_ValidationInterfaceBlockChecked)(void* user_data, const kernel_BlockPointer* block, const kernel_BlockValidationState* state);
+typedef void (*kernel_ValidationInterfaceBlockChecked)(void* user_data, kernel_Block* block, const kernel_BlockValidationState* state);
 
 /**
  * Whether a validated data structure is valid, invalid, or an error was
@@ -937,16 +931,6 @@ BITCOINKERNEL_API kernel_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_bloc
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Calculate and return the hash of a block.
- *
- * @param[in] block Non-null.
- * @return    The block hash.
- */
-BITCOINKERNEL_API kernel_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_pointer_get_hash(
-    const kernel_BlockPointer* block
-) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
  * @brief Copies block data into the returned byte array.
  *
  * @param[in] block  Non-null.
@@ -954,16 +938,6 @@ BITCOINKERNEL_API kernel_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_bloc
  */
 BITCOINKERNEL_API kernel_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_copy_data(
     kernel_Block* block
-) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
- * @brief Copies block data into the returned byte array.
- *
- * @param[in] block  Non-null.
- * @return           Allocated byte array holding the block data.
- */
-BITCOINKERNEL_API kernel_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT kernel_block_pointer_copy_data(
-    const kernel_BlockPointer* block
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**

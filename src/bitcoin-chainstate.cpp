@@ -47,7 +47,7 @@ public:
 
     std::optional<std::string> m_expected_valid_block = std::nullopt;
 
-    void BlockChecked(const UnownedBlock block, const BlockValidationState state) override
+    void BlockChecked(Block block, const BlockValidationState state) override
     {
         auto mode{state.ValidationMode()};
         switch (mode) {

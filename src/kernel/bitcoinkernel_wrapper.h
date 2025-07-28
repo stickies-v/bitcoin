@@ -226,33 +226,6 @@ struct BlockHashDeleter {
     }
 };
 
-class UnownedBlock
-{
-private:
-    const kernel_BlockPointer* m_block;
-
-public:
-    UnownedBlock(const kernel_BlockPointer* block) noexcept : m_block{block} {}
-
-    UnownedBlock(const UnownedBlock&) = delete;
-    UnownedBlock& operator=(const UnownedBlock&) = delete;
-    UnownedBlock(UnownedBlock&&) = delete;
-    UnownedBlock& operator=(UnownedBlock&&) = delete;
-
-    std::unique_ptr<kernel_BlockHash, BlockHashDeleter> GetHash() const noexcept
-    {
-        return std::unique_ptr<kernel_BlockHash, BlockHashDeleter>(kernel_block_pointer_get_hash(m_block));
-    }
-
-    std::vector<unsigned char> GetBlockData() const noexcept
-    {
-        auto serialized_block{kernel_block_pointer_copy_data(m_block)};
-        std::vector<unsigned char> vec{serialized_block->data, serialized_block->data + serialized_block->size};
-        kernel_byte_array_destroy(serialized_block);
-        return vec;
-    }
-};
-
 class BlockValidationState
 {
 private:
@@ -277,6 +250,45 @@ public:
     }
 };
 
+class Block
+{
+private:
+    struct Deleter {
+        void operator()(kernel_Block* ptr) const
+        {
+            kernel_block_destroy(ptr);
+        }
+    };
+
+    std::unique_ptr<kernel_Block, Deleter> m_block;
+
+public:
+    Block(const std::span<const unsigned char> raw_block) noexcept
+        : m_block{kernel_block_create(raw_block.data(), raw_block.size())}
+    {
+    }
+
+    /** Check whether this Block object is valid. */
+    explicit operator bool() const noexcept { return bool{m_block}; }
+
+    Block(kernel_Block* block) noexcept : m_block{block} {}
+
+    std::unique_ptr<kernel_BlockHash, BlockHashDeleter> GetHash() const noexcept
+    {
+        return std::unique_ptr<kernel_BlockHash, BlockHashDeleter>(kernel_block_get_hash(m_block.get()));
+    }
+
+    std::vector<unsigned char> GetBlockData() const noexcept
+    {
+        auto serialized_block{kernel_block_copy_data(m_block.get())};
+        std::vector<unsigned char> vec{serialized_block->data, serialized_block->data + serialized_block->size};
+        kernel_byte_array_destroy(serialized_block);
+        return vec;
+    }
+
+    friend class ChainMan;
+};
+
 template <typename T>
 class ValidationInterface
 {
@@ -285,17 +297,17 @@ private:
 
 public:
     ValidationInterface() noexcept : m_validation_interface{kernel_ValidationInterfaceCallbacks{
-                                .user_data = this,
-                                .block_checked = [](void* user_data, const kernel_BlockPointer* block, const kernel_BlockValidationState* state) {
-                                    static_cast<T*>(user_data)->BlockChecked(UnownedBlock{block}, BlockValidationState{state});
-                                },
-                            }}
+                                         .user_data = this,
+                                         .block_checked = [](void* user_data, kernel_Block* block, const kernel_BlockValidationState* state) {
+                                             static_cast<T*>(user_data)->BlockChecked(Block{block}, BlockValidationState{state});
+                                         },
+                                     }}
     {
     }
 
     virtual ~ValidationInterface() = default;
 
-    virtual void BlockChecked(UnownedBlock block, const BlockValidationState state) {}
+    virtual void BlockChecked(Block block, const BlockValidationState state) {}
 
     friend class ContextOptions;
 };
@@ -420,45 +432,6 @@ public:
 
     /** Check whether this ChainstateManagerOptions object is valid. */
     explicit operator bool() const noexcept { return bool{m_options}; }
-
-    friend class ChainMan;
-};
-
-class Block
-{
-private:
-    struct Deleter {
-        void operator()(kernel_Block* ptr) const
-        {
-            kernel_block_destroy(ptr);
-        }
-    };
-
-    std::unique_ptr<kernel_Block, Deleter> m_block;
-
-public:
-    Block(const std::span<const unsigned char> raw_block) noexcept
-        : m_block{kernel_block_create(raw_block.data(), raw_block.size())}
-    {
-    }
-
-    /** Check whether this Block object is valid. */
-    explicit operator bool() const noexcept { return bool{m_block}; }
-
-    Block(kernel_Block* block) noexcept : m_block{block} {}
-
-    std::unique_ptr<kernel_BlockHash, BlockHashDeleter> GetHash() const noexcept
-    {
-        return std::unique_ptr<kernel_BlockHash, BlockHashDeleter>(kernel_block_get_hash(m_block.get()));
-    }
-
-    std::vector<unsigned char> GetBlockData() const noexcept
-    {
-        auto serialized_block{kernel_block_copy_data(m_block.get())};
-        std::vector<unsigned char> vec{serialized_block->data, serialized_block->data + serialized_block->size};
-        kernel_byte_array_destroy(serialized_block);
-        return vec;
-    }
 
     friend class ChainMan;
 };

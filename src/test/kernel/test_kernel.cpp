@@ -123,7 +123,7 @@ public:
 
     std::optional<std::vector<unsigned char>> m_expected_valid_block = std::nullopt;
 
-    void BlockChecked(const UnownedBlock block, const BlockValidationState state) override
+    void BlockChecked(Block block, const BlockValidationState state) override
     {
         {
             auto serialized_block{block.GetBlockData()};

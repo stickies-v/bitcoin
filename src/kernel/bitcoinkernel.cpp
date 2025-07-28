@@ -229,8 +229,9 @@ protected:
     void BlockChecked(std::shared_ptr<const CBlock> block, const BlockValidationState& stateIn) override
     {
         if (m_cbs.block_checked) {
+            auto block_handle{new kernel_Block{std::move(block)}};
             m_cbs.block_checked((void*)m_cbs.user_data,
-                                reinterpret_cast<const kernel_BlockPointer*>(block.get()),
+                                block_handle,
                                 reinterpret_cast<const kernel_BlockValidationState*>(&stateIn));
         }
     }
@@ -399,12 +400,6 @@ const BlockValidationState* cast_block_validation_state(const kernel_BlockValida
 {
     assert(block_validation_state);
     return reinterpret_cast<const BlockValidationState*>(block_validation_state);
-}
-
-const CBlock* cast_const_cblock(const kernel_BlockPointer* block)
-{
-    assert(block);
-    return reinterpret_cast<const CBlock*>(block);
 }
 
 const CBlockIndex* cast_const_block_index(const kernel_BlockIndex* index)
@@ -932,35 +927,9 @@ kernel_ByteArray* kernel_block_copy_data(kernel_Block* block)
     return byte_array;
 }
 
-kernel_ByteArray* kernel_block_pointer_copy_data(const kernel_BlockPointer* block_)
-{
-    auto block{cast_const_cblock(block_)};
-
-    DataStream ss{};
-    ss << TX_WITH_WITNESS(*block);
-
-    auto byte_array{new kernel_ByteArray{
-        .data = new unsigned char[ss.size()],
-        .size = ss.size(),
-    }};
-
-    std::memcpy(byte_array->data, ss.data(), byte_array->size);
-
-    return byte_array;
-}
-
 kernel_BlockHash* kernel_block_get_hash(kernel_Block* block)
 {
     auto hash{block->get().GetHash()};
-    auto block_hash = new kernel_BlockHash{};
-    std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
-    return block_hash;
-}
-
-kernel_BlockHash* kernel_block_pointer_get_hash(const kernel_BlockPointer* block_)
-{
-    auto block{cast_const_cblock(block_)};
-    auto hash{block->GetHash()};
     auto block_hash = new kernel_BlockHash{};
     std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
     return block_hash;
