@@ -203,11 +203,11 @@ public:
     explicit KernelValidationInterface(const kernel_ValidationInterfaceCallbacks vi_cbs) : m_cbs{vi_cbs} {}
 
 protected:
-    void BlockChecked(const CBlock& block, const BlockValidationState& stateIn) override
+    void BlockChecked(std::shared_ptr<const CBlock> block, const BlockValidationState& stateIn) override
     {
         if (m_cbs.block_checked) {
             m_cbs.block_checked((void*)m_cbs.user_data,
-                                reinterpret_cast<const kernel_BlockPointer*>(&block),
+                                reinterpret_cast<const kernel_BlockPointer*>(block.get()),
                                 reinterpret_cast<const kernel_BlockValidationState*>(&stateIn));
         }
     }
