@@ -451,6 +451,12 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     LogInstance().m_log_sourcelocations = false;
     LogInstance().m_log_threadnames = false;
 
+// This test's scheduler schedules new tasks on 2 threads, potentially causing (non-circular)
+// lock contentions. Disable those logs so we can maintain a tight accounting.
+#ifdef DEBUG_LOCKCONTENTION
+    LogInstance().DisableCategory(BCLog::LogFlags::LOCK);
+#endif
+
     constexpr int64_t line_length{1024};
     constexpr int64_t num_lines{1024};
     constexpr int64_t bytes_quota{line_length * num_lines};
@@ -470,9 +476,7 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
     TestLogFromLocation(Location::INFO_2, "c", Status::UNSUPPRESSED, /*suppressions_active=*/true);
     {
         scheduler.MockForwardAndSync(time_window);
-        auto log_lines{ReadDebugLogLines()};
-        auto restart_pred = [](std::string& s) { return s.starts_with("[warning] Restarting logging"); };
-        BOOST_CHECK(std::any_of(log_lines.begin(), log_lines.end(), restart_pred));
+        BOOST_CHECK(ReadDebugLogLines().back().starts_with("[warning] Restarting logging"));
     }
     // Check that logging from previously suppressed location is unsuppressed again.
     TestLogFromLocation(Location::INFO_1, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
