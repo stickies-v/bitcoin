@@ -388,13 +388,13 @@ struct btck_BlockSpentOutputs
 
 struct btck_TransactionSpentOutputs
 {
-    const CTxUndo* m_tx_undo;
+    CTxUndo* m_tx_undo;
     bool m_owned;
 };
 
 struct btck_Coin
 {
-    const Coin* m_coin;
+    Coin* m_coin;
     bool m_owned;
 };
 
@@ -1076,7 +1076,7 @@ uint64_t btck_block_spent_outputs_size(const btck_BlockSpentOutputs* block_spent
 btck_TransactionSpentOutputs* btck_block_spent_outputs_get_transaction_spent_outputs_at(const btck_BlockSpentOutputs* block_spent_outputs, uint64_t transaction_index)
 {
     assert(transaction_index < block_spent_outputs->m_block_undo->vtxundo.size());
-    const auto* tx_undo{&block_spent_outputs->m_block_undo->vtxundo.at(transaction_index)};
+    auto* tx_undo{&block_spent_outputs->m_block_undo->vtxundo.at(transaction_index)};
     return new btck_TransactionSpentOutputs{tx_undo, false};
 }
 
@@ -1110,7 +1110,7 @@ void btck_transaction_spent_outputs_destroy(btck_TransactionSpentOutputs* transa
 btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, uint64_t coin_index)
 {
     assert(coin_index < transaction_spent_outputs->m_tx_undo->vprevout.size());
-    const Coin* coin{&transaction_spent_outputs->m_tx_undo->vprevout.at(coin_index)};
+    Coin* coin{&transaction_spent_outputs->m_tx_undo->vprevout.at(coin_index)};
     return new btck_Coin{coin, false};
 }
 
@@ -1156,6 +1156,13 @@ const btck_TransactionOutput* btck_coin_get_output(const btck_Coin* coin)
 {
     const CTxOut* output{&coin->m_coin->out};
     return reinterpret_cast<const btck_TransactionOutput*>(output);
+}
+
+btck_TransactionOutput* btck_coin_detach_output(btck_Coin* coin)
+{
+    auto* output{new CTxOut{std::move(coin->m_coin->out)}};
+    btck_coin_destroy(coin);
+    return to_opaq(output);
 }
 
 void btck_coin_destroy(btck_Coin* coin)

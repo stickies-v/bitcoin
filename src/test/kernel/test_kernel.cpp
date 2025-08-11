@@ -609,6 +609,11 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     auto script_pubkey = output.Get().GetScriptPubkey();
     BOOST_CHECK_EQUAL(script_pubkey.Get().GetScriptPubkeyData().size(), 22);
 
+    Coin coin_copy{coin.Get()};
+    TransactionOutput detached_output{std::move(coin_copy)};
+    BOOST_CHECK_EQUAL(detached_output.GetAmount(), 100000000);
+
+
     // Test that reading past the size returns null data
     // BOOST_CHECK_THROW(block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.m_size), std::runtime_error);
 

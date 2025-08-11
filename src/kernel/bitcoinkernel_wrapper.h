@@ -105,6 +105,7 @@ public:
 
 namespace btck {
 
+class Coin;
 class Transaction;
 class TransactionOutput;
 
@@ -189,6 +190,8 @@ public:
         : ManagedPtr{check(btck_transaction_output_create(script_pubkey.m_script_pubkey.get(), amount))}
     {
     }
+
+    TransactionOutput(Coin&& coin);
 
     uint64_t GetAmount()
     {
@@ -619,9 +622,9 @@ private:
         }
     };
 
+public:
     std::unique_ptr<btck_Coin, Deleter> m_coin;
 
-public:
     Coin(btck_Coin* coin) : m_coin{check(coin)} {}
 
     // Copy constructor and assignment
@@ -644,6 +647,11 @@ public:
         return TransactionOutput{btck_coin_get_output(m_coin.get())};
     }
 };
+
+TransactionOutput::TransactionOutput(Coin&& coin)
+    : ManagedPtr(check(btck_coin_detach_output(coin.m_coin.release())))
+{
+}
 
 class TransactionSpentOutputs
 {

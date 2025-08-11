@@ -1335,6 +1335,16 @@ BITCOINKERNEL_API const btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT
     const btck_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
+ * @brief Return the transaction output of a coin. The returned pointer is
+ * owned, and the coin object is destroyed.
+ *
+ * @param[in] coin Non-null, will be destroyed.
+ * @return         A transaction output pointer.
+ */
+BITCOINKERNEL_API btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_coin_detach_output(
+    btck_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
  * Destroy the coin.
  */
 BITCOINKERNEL_API void btck_coin_destroy(btck_Coin* coin);
