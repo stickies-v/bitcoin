@@ -263,24 +263,14 @@ BOOST_AUTO_TEST_CASE(btck_transaction_tests)
     auto broken_tx_data{std::span<unsigned char>{tx_data.begin(), tx_data.begin() + 10}};
     BOOST_CHECK_THROW(Transaction{broken_tx_data}, std::runtime_error);
     auto output{tx.GetOutput(tx.CountOutputs() - 1)};
-    BOOST_CHECK_EQUAL(output.Get().GetAmount(), 42130042);
-    auto script_pubkey{output.Get().GetScriptPubkey()};
+    BOOST_CHECK_EQUAL(output.GetAmount(), 42130042);
+    auto script_pubkey{output.GetScriptPubkey()};
     {
         auto tx_new{Transaction{tx_data}};
         // This is safe, becaause we now use copy assignment
-        TransactionOutput output = tx_new.GetOutput(tx_new.CountOutputs() - 1).Get();
+        TransactionOutput output = tx_new.GetOutput(tx_new.CountOutputs() - 1);
     }
-    BOOST_CHECK_EQUAL(output.Get().GetAmount(), 42130042);
-
-    // The following code is unsafe, but left here to show limitations of the
-    // API, because we RVO-move the output beyond the lifetime of the
-    // transaction. The reference wrapper should make this clear to the user.
-    auto get_output = [&]() -> RefWrapper<TransactionOutput> {
-        auto tx{Transaction{tx_data}};
-        return tx.GetOutput(0);
-    };
-    auto output_new = get_output();
-    BOOST_CHECK_EQUAL(output_new.Get().GetAmount(), 20737411);
+    BOOST_CHECK_EQUAL(output.GetAmount(), 42130042);
 }
 
 BOOST_AUTO_TEST_CASE(btck_script_verify_tests)

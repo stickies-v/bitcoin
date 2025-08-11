@@ -302,6 +302,18 @@ struct ChainstateManagerOptions {
     }
 };
 
+template <typename To, typename From>
+To* cast(From* from)
+{
+    assert(from);
+    return reinterpret_cast<To*>(from);
+}
+
+// CTxOut <-> btck_TransactionOutput
+CTxOut* to_impl(btck_TransactionOutput* output) { return cast<CTxOut>(output); }
+const CTxOut* to_impl(const btck_TransactionOutput* output) { return cast<const CTxOut>(output); }
+btck_TransactionOutput* to_opaq(CTxOut* output) { return cast<btck_TransactionOutput>(output); }
+
 const BlockValidationState* cast_block_validation_state(const btck_BlockValidationState* block_validation_state)
 {
     assert(block_validation_state);
@@ -325,12 +337,6 @@ const CBlockIndex* cast_const_block_index(const btck_BlockIndex* index)
 struct btck_Transaction
 {
     std::shared_ptr<const CTransaction> m_tx;
-};
-
-struct btck_TransactionOutput
-{
-    const CTxOut* m_txout;
-    bool m_owned;
 };
 
 struct btck_ScriptPubkey
@@ -408,10 +414,10 @@ uint64_t btck_transaction_count_outputs(const btck_Transaction* transaction)
     return transaction->m_tx->vout.size();
 }
 
-btck_TransactionOutput* btck_transaction_get_output_at(const btck_Transaction* transaction, uint64_t output_index)
+const btck_TransactionOutput* btck_transaction_get_output_at(const btck_Transaction* transaction, uint64_t output_index)
 {
     assert(output_index < transaction->m_tx->vout.size());
-    return new btck_TransactionOutput{&transaction->m_tx->vout[output_index], false};
+    return reinterpret_cast<const btck_TransactionOutput*>(&transaction->m_tx->vout[output_index]);
 }
 
 btck_Transaction* btck_transaction_copy(const btck_Transaction* transaction)
@@ -460,33 +466,32 @@ void btck_script_pubkey_destroy(btck_ScriptPubkey* script_pubkey)
 btck_TransactionOutput* btck_transaction_output_create(const btck_ScriptPubkey* script_pubkey, int64_t amount)
 {
     const CAmount& value{amount};
-    return new btck_TransactionOutput{new CTxOut(value, *script_pubkey->m_script), true};
+    return to_opaq(new CTxOut(value, *script_pubkey->m_script));
 }
 
 btck_TransactionOutput* btck_transaction_output_copy(const btck_TransactionOutput* output)
 {
-    return new btck_TransactionOutput{new CTxOut{*output->m_txout}, true};
+    return to_opaq(new CTxOut{*to_impl(output)});
 }
 
 btck_ScriptPubkey* btck_transaction_output_get_script_pubkey(const btck_TransactionOutput* output)
 {
-    const auto* script_pubkey{&output->m_txout->scriptPubKey};
+    const auto* script_pubkey{&to_impl(output)->scriptPubKey};
     return new btck_ScriptPubkey{script_pubkey, false};
 }
 
-int64_t btck_transaction_output_get_amount(const btck_TransactionOutput* output)
+int64_t btck_transaction_output_get_amount(const btck_TransactionOutput* output_)
 {
-    return output->m_txout->nValue;
+    const auto* output{to_impl(output_)};
+    return output->nValue;
 }
 
-void btck_transaction_output_destroy(btck_TransactionOutput* output)
+void btck_transaction_output_destroy(btck_TransactionOutput* output_)
 {
-    if (!output) return;
-    if (output->m_owned) {
-        delete output->m_txout;
-    }
+    if (!output_) return;
+    auto* output{to_impl(output_)};
     delete output;
-    output = nullptr;
+    output_ = nullptr;
 }
 
 bool btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
@@ -520,7 +525,7 @@ bool btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
         assert(spent_outputs_len == tx.vin.size());
         spent_outputs.reserve(spent_outputs_len);
         for (size_t i = 0; i < spent_outputs_len; i++) {
-            const CTxOut& tx_out{*spent_outputs_[i]->m_txout};
+            const CTxOut& tx_out{*to_impl(spent_outputs_[i])};
             spent_outputs.push_back(tx_out);
         }
     }
@@ -1147,10 +1152,10 @@ bool btck_coin_is_coinbase(const btck_Coin* coin)
     return coin->m_coin->IsCoinBase();
 }
 
-btck_TransactionOutput* btck_coin_get_output(const btck_Coin* coin)
+const btck_TransactionOutput* btck_coin_get_output(const btck_Coin* coin)
 {
     const CTxOut* output{&coin->m_coin->out};
-    return new btck_TransactionOutput{output, false};
+    return reinterpret_cast<const btck_TransactionOutput*>(output);
 }
 
 void btck_coin_destroy(btck_Coin* coin)

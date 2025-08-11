@@ -482,9 +482,8 @@ BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_cou
  * @param[in] output_index The index of the transaction to be retrieved.
  * @return                 The transaction output
  */
-BITCOINKERNEL_API btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_get_output_at(
-    const btck_Transaction* transaction, uint64_t output_index
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API const btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_get_output_at(
+    const btck_Transaction* transaction, uint64_t output_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * Destroy the transaction.
@@ -1332,7 +1331,7 @@ BITCOINKERNEL_API bool BITCOINKERNEL_WARN_UNUSED_RESULT btck_coin_is_coinbase(
  * @param[in] coin Non-null.
  * @return         A transaction output pointer.
  */
-BITCOINKERNEL_API btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_coin_get_output(
+BITCOINKERNEL_API const btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_coin_get_output(
     const btck_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**

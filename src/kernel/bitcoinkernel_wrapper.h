@@ -34,6 +34,12 @@ T check(T ptr)
 template <typename T>
 struct PointerTraits;
 
+template <>
+struct PointerTraits<btck_TransactionOutput> {
+    static btck_TransactionOutput* copy(const btck_TransactionOutput* ptr) { return btck_transaction_output_copy(ptr); }
+    static void destroy(btck_TransactionOutput* ptr) noexcept { btck_transaction_output_destroy(ptr); }
+};
+
 template <typename T, typename Derived, typename Traits = PointerTraits<T>>
 class ManagedPtr
 {
@@ -175,48 +181,23 @@ public:
     }
 };
 
-class TransactionOutput
+class TransactionOutput : public util::ManagedPtr<btck_TransactionOutput, TransactionOutput>
 {
-private:
-    struct Deleter {
-        void operator()(btck_TransactionOutput* ptr) const noexcept
-        {
-            btck_transaction_output_destroy(ptr);
-        }
-    };
-
 public:
-    std::unique_ptr<btck_TransactionOutput, Deleter> m_transaction_output;
-
+    using util::ManagedPtr<btck_TransactionOutput, TransactionOutput>::ManagedPtr;
     TransactionOutput(const ScriptPubkey& script_pubkey, int64_t amount)
-        : m_transaction_output{check(btck_transaction_output_create(script_pubkey.m_script_pubkey.get(), amount))}
-    {
-    }
-
-    // Copy constructor and assignment
-    TransactionOutput(const TransactionOutput& other)
-        : m_transaction_output{check(btck_transaction_output_copy(other.m_transaction_output.get()))} { }
-    TransactionOutput& operator=(const TransactionOutput& other)
-    {
-        if (this != &other) {
-            m_transaction_output.reset(check(btck_transaction_output_copy(other.m_transaction_output.get())));
-        }
-        return *this;
-    }
-
-    TransactionOutput(btck_TransactionOutput* transaction_output)
-        : m_transaction_output{check(transaction_output)}
+        : ManagedPtr{check(btck_transaction_output_create(script_pubkey.m_script_pubkey.get(), amount))}
     {
     }
 
     uint64_t GetAmount()
     {
-        return btck_transaction_output_get_amount(m_transaction_output.get());
+        return btck_transaction_output_get_amount(get());
     }
 
     RefWrapper<ScriptPubkey> GetScriptPubkey()
     {
-        return ScriptPubkey{btck_transaction_output_get_script_pubkey(m_transaction_output.get())};
+        return ScriptPubkey{btck_transaction_output_get_script_pubkey(get())};
     }
 };
 
@@ -259,7 +240,7 @@ public:
         return btck_transaction_count_outputs(m_transaction.get());
     }
 
-    RefWrapper<TransactionOutput> GetOutput(uint64_t index)
+    TransactionOutput GetOutput(uint64_t index)
     {
         return TransactionOutput{btck_transaction_get_output_at(m_transaction.get(), index)};
     }
@@ -278,7 +259,7 @@ int ScriptPubkey::Verify(int64_t amount,
         raw_spent_outputs.reserve(spent_outputs.size());
 
         for (const auto& output : spent_outputs) {
-            raw_spent_outputs.push_back(output.m_transaction_output.get());
+            raw_spent_outputs.push_back(output.get());
         }
         spent_outputs_ptr = raw_spent_outputs.data();
     }
@@ -658,7 +639,7 @@ public:
 
     bool IsCoinbase() const { return btck_coin_is_coinbase(m_coin.get()); }
 
-    RefWrapper<TransactionOutput> GetOutput() const
+    TransactionOutput GetOutput() const
     {
         return TransactionOutput{btck_coin_get_output(m_coin.get())};
     }
