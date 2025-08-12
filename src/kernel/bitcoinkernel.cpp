@@ -477,6 +477,14 @@ const btck_ScriptPubkey* btck_transaction_output_get_script_pubkey(const btck_Tr
     return to_opaq(&to_impl(output)->scriptPubKey);
 }
 
+btck_ScriptPubkey* btck_transaction_output_detach_script_pubkey(btck_TransactionOutput* output)
+{
+    auto* spk{new CScript{std::move(to_impl(output)->scriptPubKey)}};
+    btck_transaction_output_destroy(output);
+    return to_opaq(spk);
+}
+
+
 int64_t btck_transaction_output_get_amount(const btck_TransactionOutput* output_)
 {
     const auto* output{to_impl(output_)};

@@ -609,6 +609,9 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     auto script_pubkey = output.Get().GetScriptPubkey();
     BOOST_CHECK_EQUAL(script_pubkey.Get().GetScriptPubkeyData().size(), 22);
 
+    ScriptPubkey detached_spk{output.Get().deep_copy()};
+    BOOST_CHECK_EQUAL(detached_spk.GetScriptPubkeyData().size(), 22);
+
     Coin coin_copy{coin.Get()};
     TransactionOutput detached_output{std::move(coin_copy)};
     BOOST_CHECK_EQUAL(detached_output.GetAmount(), 100000000);

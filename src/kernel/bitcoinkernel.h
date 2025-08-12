@@ -593,6 +593,16 @@ BITCOINKERNEL_API const btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck
     const btck_TransactionOutput* transaction_output) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
+ * @brief Get the script pubkey of the output. The returned pointer is
+ * owned, and the transaction output object is destroyed.
+ *
+ * @param[in] transaction_output Non-null, will be destroyed.
+ * @return                       The script pubkey.
+ */
+BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_output_detach_script_pubkey(
+    btck_TransactionOutput* transaction_output) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
  * @brief Get the amount in the output.
  *
  * @param[in] transaction_output Non-null.

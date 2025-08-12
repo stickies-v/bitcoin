@@ -144,6 +144,7 @@ public:
         : ManagedPtr(check(btck_script_pubkey_create(script_pubkey.data(), script_pubkey.size())))
     {
     }
+    explicit ScriptPubkey(TransactionOutput&& output);
     int Verify(int64_t amount,
                const Transaction& tx_to,
                const std::span<const TransactionOutput> spent_outputs,
@@ -182,6 +183,9 @@ public:
         return ScriptPubkey{spk};
     }
 };
+
+ScriptPubkey::ScriptPubkey(TransactionOutput&& output)
+    : ManagedPtr(check(btck_transaction_output_detach_script_pubkey(output.release()))) {}
 
 class Transaction
 {
