@@ -13,12 +13,14 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
-namespace btck {
-
-class Transaction;
-class TransactionOutput;
+namespace util {
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
 
 template <typename T>
 T check(T ptr)
@@ -28,6 +30,80 @@ T check(T ptr)
     }
     return ptr;
 }
+
+template <typename T>
+struct PointerTraits;
+
+template <typename T, typename Derived, typename Traits = PointerTraits<T>>
+class ManagedPtr
+{
+private:
+    struct Deleter {
+        void operator()(T* ptr) const noexcept
+        {
+            Traits::destroy(ptr);
+        }
+    };
+    using OwningPtr = std::unique_ptr<T, Deleter>;
+    using NonOwningPtr = const T*;
+    std::variant<OwningPtr, NonOwningPtr> m_ptr;
+
+public:
+    explicit ManagedPtr(const T* ptr) : m_ptr{NonOwningPtr{check(ptr)}} {}
+    explicit ManagedPtr(T* ptr) : m_ptr{OwningPtr{check(ptr)}} {}
+
+    // Copy constructor and assignment
+    ManagedPtr(const ManagedPtr& other)
+        : m_ptr{std::visit(util::overloaded{
+                               [](const OwningPtr& p) -> decltype(m_ptr) { return OwningPtr(check(Traits::copy(p.get()))); },
+                               [](NonOwningPtr p) -> decltype(m_ptr) { return p; }},
+                           other.m_ptr)}
+    {
+    }
+    ManagedPtr& operator=(const ManagedPtr& other)
+    {
+        if (this != &other) {
+            m_ptr = std::visit(util::overloaded{
+                                   [](const OwningPtr& p) -> decltype(m_ptr) { return OwningPtr(check(Traits::copy(p.get()))); },
+                                   [](NonOwningPtr p) -> decltype(m_ptr) { return p; }},
+                               other.m_ptr);
+        }
+        return *this;
+    }
+
+    // Move semantics
+    ManagedPtr(ManagedPtr&&) noexcept = default;
+    ManagedPtr& operator=(ManagedPtr&&) noexcept = default;
+
+    const T* get() const
+    {
+        return std::visit(util::overloaded{
+                              [](const OwningPtr& p) -> const T* { return p.get(); },
+                              [](NonOwningPtr p) { return p; }},
+                          m_ptr);
+    }
+
+    Derived deep_copy()
+    {
+        return Derived{Traits::copy(get())};
+    }
+
+    T* release()
+    {
+        auto* p{std::get_if<OwningPtr>(&m_ptr)};
+        return p ? p->release() : nullptr;
+    }
+};
+
+} // namespace util
+
+namespace btck {
+
+class Transaction;
+class TransactionOutput;
+
+using util::check;
+
 
 template <typename T>
 class RefWrapper
