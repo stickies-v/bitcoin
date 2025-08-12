@@ -309,6 +309,12 @@ To* cast(From* from)
     return reinterpret_cast<To*>(from);
 }
 
+// CScript <-> btck_Script
+CScript* to_impl(btck_ScriptPubkey* spk) { return cast<CScript>(spk); }
+const CScript* to_impl(const btck_ScriptPubkey* spk) { return cast<const CScript>(spk); }
+btck_ScriptPubkey* to_opaq(CScript* script) { return cast<btck_ScriptPubkey>(script); }
+const btck_ScriptPubkey* to_opaq(const CScript* script) { return cast<const btck_ScriptPubkey>(script); }
+
 // CTxOut <-> btck_TransactionOutput
 CTxOut* to_impl(btck_TransactionOutput* output) { return cast<CTxOut>(output); }
 const CTxOut* to_impl(const btck_TransactionOutput* output) { return cast<const CTxOut>(output); }
@@ -337,12 +343,6 @@ const CBlockIndex* cast_const_block_index(const btck_BlockIndex* index)
 struct btck_Transaction
 {
     std::shared_ptr<const CTransaction> m_tx;
-};
-
-struct btck_ScriptPubkey
-{
-    const CScript* m_script;
-    bool m_owned;
 };
 
 struct btck_LoggingConnection
@@ -434,39 +434,37 @@ void btck_transaction_destroy(btck_Transaction* transaction)
 
 btck_ScriptPubkey* btck_script_pubkey_create(const unsigned char* script_pubkey, size_t script_pubkey_len)
 {
-    return new btck_ScriptPubkey{new CScript(script_pubkey, script_pubkey + script_pubkey_len), true};
+    return to_opaq(new CScript(script_pubkey, script_pubkey + script_pubkey_len));
 }
 
 btck_ByteArray* btck_script_pubkey_copy_data(const btck_ScriptPubkey* script_pubkey)
 {
+    const auto* script{to_impl(script_pubkey)};
     auto byte_array{new btck_ByteArray{
-        .data = new unsigned char[script_pubkey->m_script->size()],
-        .size = script_pubkey->m_script->size(),
+        .data = new unsigned char[script->size()],
+        .size = script->size(),
     }};
 
-    std::memcpy(byte_array->data, script_pubkey->m_script->data(), byte_array->size);
+    std::memcpy(byte_array->data, script->data(), byte_array->size);
     return byte_array;
 }
 
 btck_ScriptPubkey* btck_script_pubkey_copy(const btck_ScriptPubkey* script_pubkey)
 {
-    return new btck_ScriptPubkey{new CScript(*script_pubkey->m_script), true};
+    return to_opaq(new CScript{*to_impl(script_pubkey)});
 }
 
 void btck_script_pubkey_destroy(btck_ScriptPubkey* script_pubkey)
 {
     if (!script_pubkey) return;
-    if (script_pubkey->m_owned) {
-        delete script_pubkey->m_script;
-    }
-    delete script_pubkey;
+    delete to_impl(script_pubkey);
     script_pubkey = nullptr;
 }
 
 btck_TransactionOutput* btck_transaction_output_create(const btck_ScriptPubkey* script_pubkey, int64_t amount)
 {
     const CAmount& value{amount};
-    return to_opaq(new CTxOut(value, *script_pubkey->m_script));
+    return to_opaq(new CTxOut(value, *to_impl(script_pubkey)));
 }
 
 btck_TransactionOutput* btck_transaction_output_copy(const btck_TransactionOutput* output)
@@ -474,10 +472,9 @@ btck_TransactionOutput* btck_transaction_output_copy(const btck_TransactionOutpu
     return to_opaq(new CTxOut{*to_impl(output)});
 }
 
-btck_ScriptPubkey* btck_transaction_output_get_script_pubkey(const btck_TransactionOutput* output)
+const btck_ScriptPubkey* btck_transaction_output_get_script_pubkey(const btck_TransactionOutput* output)
 {
-    const auto* script_pubkey{&to_impl(output)->scriptPubKey};
-    return new btck_ScriptPubkey{script_pubkey, false};
+    return to_opaq(&to_impl(output)->scriptPubKey);
 }
 
 int64_t btck_transaction_output_get_amount(const btck_TransactionOutput* output_)
@@ -541,7 +538,7 @@ bool btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
     }
 
     return VerifyScript(tx.vin[input_index].scriptSig,
-                        *script_pubkey->m_script,
+                        *to_impl(script_pubkey),
                         &tx.vin[input_index].scriptWitness,
                         flags,
                         TransactionSignatureChecker(&tx, input_index, amount, txdata, MissingDataBehavior::FAIL),

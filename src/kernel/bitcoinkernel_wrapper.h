@@ -40,6 +40,12 @@ struct PointerTraits<btck_TransactionOutput> {
     static void destroy(btck_TransactionOutput* ptr) noexcept { btck_transaction_output_destroy(ptr); }
 };
 
+template <>
+struct PointerTraits<btck_ScriptPubkey> {
+    static btck_ScriptPubkey* copy(const btck_ScriptPubkey* ptr) { return btck_script_pubkey_copy(ptr); }
+    static void destroy(btck_ScriptPubkey* ptr) noexcept { btck_script_pubkey_destroy(ptr); }
+};
+
 template <typename T, typename Derived, typename Traits = PointerTraits<T>>
 class ManagedPtr
 {
@@ -130,24 +136,14 @@ public:
     }
 };
 
-class ScriptPubkey
+class ScriptPubkey : public util::ManagedPtr<btck_ScriptPubkey, ScriptPubkey>
 {
-private:
-    struct Deleter {
-        void operator()(btck_ScriptPubkey* ptr) const noexcept
-        {
-            btck_script_pubkey_destroy(ptr);
-        }
-    };
-
 public:
-    std::unique_ptr<btck_ScriptPubkey, Deleter> m_script_pubkey;
-
-    ScriptPubkey(std::span<const unsigned char> script_pubkey)
-        : m_script_pubkey{check(btck_script_pubkey_create(script_pubkey.data(), script_pubkey.size()))}
+    using util::ManagedPtr<btck_ScriptPubkey, ScriptPubkey>::ManagedPtr;
+    explicit ScriptPubkey(std::span<const unsigned char> script_pubkey)
+        : ManagedPtr(check(btck_script_pubkey_create(script_pubkey.data(), script_pubkey.size())))
     {
     }
-
     int Verify(int64_t amount,
                const Transaction& tx_to,
                const std::span<const TransactionOutput> spent_outputs,
@@ -155,27 +151,9 @@ public:
                unsigned int flags,
                btck_ScriptVerifyStatus& status) const;
 
-    // Copy constructor and assignment
-    ScriptPubkey(const ScriptPubkey& other)
-        : m_script_pubkey{check(btck_script_pubkey_copy(other.m_script_pubkey.get()))}
-    {
-    }
-    ScriptPubkey& operator=(const ScriptPubkey& other)
-    {
-        if (this != &other) {
-            m_script_pubkey.reset(check(btck_script_pubkey_copy(other.m_script_pubkey.get())));
-        }
-        return *this;
-    }
-
-    ScriptPubkey(btck_ScriptPubkey* script_pubkey)
-        : m_script_pubkey{check(script_pubkey)}
-    {
-    }
-
     std::vector<unsigned char> GetScriptPubkeyData() const
     {
-        auto serialized_data{btck_script_pubkey_copy_data(m_script_pubkey.get())};
+        auto serialized_data{btck_script_pubkey_copy_data(get())};
         std::vector<unsigned char> vec{serialized_data->data, serialized_data->data + serialized_data->size};
         btck_byte_array_destroy(serialized_data);
         return vec;
@@ -187,7 +165,7 @@ class TransactionOutput : public util::ManagedPtr<btck_TransactionOutput, Transa
 public:
     using util::ManagedPtr<btck_TransactionOutput, TransactionOutput>::ManagedPtr;
     TransactionOutput(const ScriptPubkey& script_pubkey, int64_t amount)
-        : ManagedPtr{check(btck_transaction_output_create(script_pubkey.m_script_pubkey.get(), amount))}
+        : ManagedPtr{check(btck_transaction_output_create(script_pubkey.get(), amount))}
     {
     }
 
@@ -200,7 +178,8 @@ public:
 
     RefWrapper<ScriptPubkey> GetScriptPubkey()
     {
-        return ScriptPubkey{btck_transaction_output_get_script_pubkey(get())};
+        const auto* spk{btck_transaction_output_get_script_pubkey(get())};
+        return ScriptPubkey{spk};
     }
 };
 
@@ -267,7 +246,7 @@ int ScriptPubkey::Verify(int64_t amount,
         spent_outputs_ptr = raw_spent_outputs.data();
     }
     return btck_script_pubkey_verify(
-        m_script_pubkey.get(),
+        this->get(),
         amount,
         tx_to.m_transaction.get(),
         spent_outputs_ptr, spent_outputs.size(),
