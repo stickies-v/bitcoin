@@ -13,14 +13,20 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <variant>
 #include <vector>
 
-namespace util {
-template <class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
+namespace btck {
+
+class Coin;
+class ScriptPubkeyView;
+class ScriptPubKey;
+class Transaction;
+class TransactionOutput;
+class TransactionOutputView;
+
+} // namespace btck
+
+namespace {
 
 template <typename T>
 T check(T ptr)
@@ -31,92 +37,98 @@ T check(T ptr)
     return ptr;
 }
 
-template <typename T>
-struct PointerTraits;
+template <typename CT>
+struct TypeTraits;
 
-template <>
-struct PointerTraits<btck_TransactionOutput> {
-    static btck_TransactionOutput* copy(const btck_TransactionOutput* ptr) { return btck_transaction_output_copy(ptr); }
-    static void destroy(btck_TransactionOutput* ptr) noexcept { btck_transaction_output_destroy(ptr); }
+template <typename CT, typename ViewT, typename OwnedT>
+struct TraitsBase {
+    using c_t = CT;
+    using view_t = ViewT;
+    using owned_t = OwnedT;
 };
 
 template <>
-struct PointerTraits<btck_ScriptPubkey> {
-    static btck_ScriptPubkey* copy(const btck_ScriptPubkey* ptr) { return btck_script_pubkey_copy(ptr); }
-    static void destroy(btck_ScriptPubkey* ptr) noexcept { btck_script_pubkey_destroy(ptr); }
+struct TypeTraits<btck_ScriptPubkey> : public TraitsBase<btck_ScriptPubkey, btck::ScriptPubkeyView, btck::ScriptPubKey> {
+    static constexpr auto copy_fn = &btck_script_pubkey_copy;
+    static constexpr auto destroy_fn = &btck_script_pubkey_destroy;
 };
 
-template <typename T, typename Derived, typename Traits = PointerTraits<T>>
-class ManagedPtr
+template <>
+struct TypeTraits<btck_TransactionOutput> : public TraitsBase<btck_TransactionOutput, btck::TransactionOutputView, btck::TransactionOutput> {
+    static constexpr auto copy_fn = &btck_transaction_output_copy;
+    static constexpr auto destroy_fn = &btck_transaction_output_destroy;
+};
+
+template <typename Traits>
+struct Deleter {
+    void operator()(Traits::c_t* ptr) const { Traits::destroy_fn(ptr); }
+};
+
+
+// Helper struct so an OwnedBase can call ViewBase methods through
+// the -> operator.
+template <typename View>
+class ArrowProxy
 {
-private:
-    struct Deleter {
-        void operator()(T* ptr) const noexcept
-        {
-            Traits::destroy(ptr);
-        }
-    };
-    using OwningPtr = std::unique_ptr<T, Deleter>;
-    using NonOwningPtr = const T*;
-    std::variant<OwningPtr, NonOwningPtr> m_ptr;
-
 public:
-    explicit ManagedPtr(const T* ptr) : m_ptr{NonOwningPtr{check(ptr)}} {}
-    explicit ManagedPtr(T* ptr) : m_ptr{OwningPtr{check(ptr)}} {}
+    explicit ArrowProxy(View v) : m_view(std::move(v)) {}
+    const View* operator->() const { return &m_view; }
 
-    // Copy constructor and assignment
-    ManagedPtr(const ManagedPtr& other)
-        : m_ptr{std::visit(util::overloaded{
-                               [](const OwningPtr& p) -> decltype(m_ptr) { return OwningPtr(check(Traits::copy(p.get()))); },
-                               [](NonOwningPtr p) -> decltype(m_ptr) { return p; }},
-                           other.m_ptr)}
-    {
-    }
-    ManagedPtr& operator=(const ManagedPtr& other)
-    {
-        if (this != &other) {
-            m_ptr = std::visit(util::overloaded{
-                                   [](const OwningPtr& p) -> decltype(m_ptr) { return OwningPtr(check(Traits::copy(p.get()))); },
-                                   [](NonOwningPtr p) -> decltype(m_ptr) { return p; }},
-                               other.m_ptr);
-        }
-        return *this;
-    }
-
-    // Move semantics
-    ManagedPtr(ManagedPtr&&) noexcept = default;
-    ManagedPtr& operator=(ManagedPtr&&) noexcept = default;
-
-    const T* get() const
-    {
-        return std::visit(util::overloaded{
-                              [](const OwningPtr& p) -> const T* { return p.get(); },
-                              [](NonOwningPtr p) { return p; }},
-                          m_ptr);
-    }
-
-    Derived deep_copy()
-    {
-        return Derived{Traits::copy(get())};
-    }
-
-    T* release()
-    {
-        auto* p{std::get_if<OwningPtr>(&m_ptr)};
-        return p ? p->release() : nullptr;
-    }
+private:
+    View m_view;
 };
 
-} // namespace util
+template <typename CType, typename Traits = TypeTraits<CType>>
+class ViewBase
+{
+public:
+    ViewBase(const Traits::c_t* ptr = nullptr) : m_ptr(ptr) {}
+    operator const typename Traits::c_t *() const { return m_ptr; }
+
+    [[nodiscard]] typename Traits::owned_t deep_copy() const
+        requires requires { Traits::copy_fn; }
+    {
+        return typename Traits::owned_t(Traits::copy_fn(m_ptr));
+    }
+
+protected:
+    const Traits::c_t* m_ptr;
+};
+
+template <typename CType, typename Traits = TypeTraits<CType>>
+class OwnedBase
+{
+public:
+    using c_t = Traits::c_t;
+    using view_t = Traits::view_t;
+    using owned_t = Traits::owned_t;
+
+    // prevent accidental deep copies, explicitly require calling deep_copy() instead
+    OwnedBase(const OwnedBase&) = delete;
+    OwnedBase& operator=(const OwnedBase&) = delete;
+
+    OwnedBase(OwnedBase&&) noexcept = default;
+    OwnedBase& operator=(OwnedBase&&) noexcept = default;
+
+    // ensure view constructors can only be called on l-values to avoid dangling references
+    view_t view() const& { return m_ptr.get(); }
+    ArrowProxy<view_t> operator->() const& { return ArrowProxy(view()); }
+    operator view_t() const& { return view(); }
+
+    explicit operator bool() const { return m_ptr != nullptr; }
+
+    owned_t deep_copy() const { return Traits::copy_fn(*this); }
+
+protected:
+    c_t* release() { return m_ptr.release(); }
+    explicit OwnedBase(Traits::c_t* ptr = nullptr) : m_ptr(ptr) {}
+    ~OwnedBase() = default;
+    std::unique_ptr<c_t, Deleter<Traits>> m_ptr;
+};
+
+} // namespace
 
 namespace btck {
-
-class Coin;
-class Transaction;
-class TransactionOutput;
-
-using util::check;
-
 
 template <typename T>
 class RefWrapper
@@ -136,56 +148,77 @@ public:
     }
 };
 
-class ScriptPubkey : public util::ManagedPtr<btck_ScriptPubkey, ScriptPubkey>
+class ScriptPubkeyView : public ViewBase<btck_ScriptPubkey>
 {
 public:
-    using util::ManagedPtr<btck_ScriptPubkey, ScriptPubkey>::ManagedPtr;
-    explicit ScriptPubkey(std::span<const unsigned char> script_pubkey)
-        : ManagedPtr(check(btck_script_pubkey_create(script_pubkey.data(), script_pubkey.size())))
-    {
-    }
-    explicit ScriptPubkey(TransactionOutput&& output);
-    int Verify(int64_t amount,
-               const Transaction& tx_to,
-               const std::span<const TransactionOutput> spent_outputs,
-               unsigned int input_index,
-               unsigned int flags,
-               btck_ScriptVerifyStatus& status) const;
+    using ViewBase::ViewBase;
 
     std::vector<unsigned char> GetScriptPubkeyData() const
     {
-        auto serialized_data{btck_script_pubkey_copy_data(get())};
+        auto serialized_data{btck_script_pubkey_copy_data(*this)};
         std::vector<unsigned char> vec{serialized_data->data, serialized_data->data + serialized_data->size};
         btck_byte_array_destroy(serialized_data);
         return vec;
     }
+
+    int Verify(int64_t amount,
+               const Transaction& tx_to,
+               const std::span<TransactionOutputView> spent_outputs,
+               unsigned int input_index,
+               unsigned int flags,
+               btck_ScriptVerifyStatus& status) const;
 };
 
-class TransactionOutput : public util::ManagedPtr<btck_TransactionOutput, TransactionOutput>
+class ScriptPubkey : public OwnedBase<btck_ScriptPubkey>
 {
 public:
-    using util::ManagedPtr<btck_TransactionOutput, TransactionOutput>::ManagedPtr;
-    TransactionOutput(const ScriptPubkey& script_pubkey, int64_t amount)
-        : ManagedPtr{check(btck_transaction_output_create(script_pubkey.get(), amount))}
+    using OwnedBase::OwnedBase;
+    explicit ScriptPubkey(std::span<const unsigned char> script_pubkey)
+        : OwnedBase(check(btck_script_pubkey_create(script_pubkey.data(), script_pubkey.size())))
     {
     }
+    explicit ScriptPubkey(TransactionOutput&& output);
 
-    TransactionOutput(Coin&& coin);
+private:
+    friend class TransactionOutput;
+    explicit ScriptPubkey(btck_ScriptPubkey* spk) : OwnedBase(spk) {}
+};
 
-    uint64_t GetAmount()
+class TransactionOutputView : public ViewBase<btck_TransactionOutput>
+{
+public:
+    using ViewBase::ViewBase;
+    uint64_t GetAmount() const
     {
-        return btck_transaction_output_get_amount(get());
+        return btck_transaction_output_get_amount(*this);
     }
 
-    RefWrapper<ScriptPubkey> GetScriptPubkey()
+    ScriptPubkeyView GetScriptPubkey() const
     {
-        const auto* spk{btck_transaction_output_get_script_pubkey(get())};
-        return ScriptPubkey{spk};
+        return btck_transaction_output_get_script_pubkey(*this);
     }
 };
 
-ScriptPubkey::ScriptPubkey(TransactionOutput&& output)
-    : ManagedPtr(check(btck_transaction_output_detach_script_pubkey(output.release()))) {}
+class TransactionOutput : public OwnedBase<btck_TransactionOutput>
+{
+public:
+    using OwnedBase::OwnedBase;
+    TransactionOutput(const ScriptPubkeyView& script_pubkey, int64_t amount)
+        : OwnedBase{check(btck_transaction_output_create(script_pubkey, amount))} {}
+    TransactionOutput(Coin&& coin);
+
+    ScriptPubkey DetachScriptPubkey()
+    {
+        if (!m_ptr) throw std::runtime_error("scriptpubkey cannot be detached");
+        return ScriptPubkey{check(btck_transaction_output_detach_script_pubkey(this->release()))};
+    }
+
+private:
+    friend class ViewBase<btck_TransactionOutput>;
+    explicit TransactionOutput(btck_TransactionOutput* ptr) : OwnedBase(ptr) {}
+};
+
+ScriptPubkey::ScriptPubkey(TransactionOutput&& output) : OwnedBase(output.DetachScriptPubkey()) {}
 
 class Transaction
 {
@@ -226,18 +259,18 @@ public:
         return btck_transaction_count_outputs(m_transaction.get());
     }
 
-    TransactionOutput GetOutput(uint64_t index)
+    TransactionOutputView GetOutput(uint64_t index)
     {
-        return TransactionOutput{btck_transaction_get_output_at(m_transaction.get(), index)};
+        return btck_transaction_get_output_at(m_transaction.get(), index);
     }
 };
 
-int ScriptPubkey::Verify(int64_t amount,
-                  const Transaction& tx_to,
-                  const std::span<const TransactionOutput> spent_outputs,
-                  unsigned int input_index,
-                  unsigned int flags,
-                  btck_ScriptVerifyStatus& status) const
+int ScriptPubkeyView::Verify(int64_t amount,
+                             const Transaction& tx_to,
+                             const std::span<TransactionOutputView> spent_outputs,
+                             unsigned int input_index,
+                             unsigned int flags,
+                             btck_ScriptVerifyStatus& status) const
 {
     const btck_TransactionOutput** spent_outputs_ptr = nullptr;
     std::vector<const btck_TransactionOutput*> raw_spent_outputs;
@@ -245,12 +278,12 @@ int ScriptPubkey::Verify(int64_t amount,
         raw_spent_outputs.reserve(spent_outputs.size());
 
         for (const auto& output : spent_outputs) {
-            raw_spent_outputs.push_back(output.get());
+            raw_spent_outputs.push_back(output);
         }
         spent_outputs_ptr = raw_spent_outputs.data();
     }
     return btck_script_pubkey_verify(
-        this->get(),
+        *this,
         amount,
         tx_to.m_transaction.get(),
         spent_outputs_ptr, spent_outputs.size(),
@@ -625,14 +658,14 @@ public:
 
     bool IsCoinbase() const { return btck_coin_is_coinbase(m_coin.get()); }
 
-    TransactionOutput GetOutput() const
+    TransactionOutputView GetOutput() const
     {
-        return TransactionOutput{btck_coin_get_output(m_coin.get())};
+        return btck_coin_get_output(m_coin.get());
     }
 };
 
 TransactionOutput::TransactionOutput(Coin&& coin)
-    : ManagedPtr(check(btck_coin_detach_output(coin.m_coin.release())))
+    : OwnedBase(check(btck_coin_detach_output(coin.m_coin.release())))
 {
 }
 

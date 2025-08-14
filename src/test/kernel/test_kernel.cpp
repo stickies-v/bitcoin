@@ -188,9 +188,9 @@ public:
 };
 
 void run_verify_test(
-    const ScriptPubkey& spent_script_pubkey,
+    const ScriptPubkeyView& spent_script_pubkey,
     const Transaction& spending_tx,
-    std::span<TransactionOutput> spent_outputs,
+    std::span<TransactionOutputView> spent_outputs,
     int64_t amount,
     unsigned int input_index,
     bool taproot)
@@ -262,15 +262,15 @@ BOOST_AUTO_TEST_CASE(btck_transaction_tests)
     auto tx{Transaction{tx_data}};
     auto broken_tx_data{std::span<unsigned char>{tx_data.begin(), tx_data.begin() + 10}};
     BOOST_CHECK_THROW(Transaction{broken_tx_data}, std::runtime_error);
-    auto output{tx.GetOutput(tx.CountOutputs() - 1)};
-    BOOST_CHECK_EQUAL(output.GetAmount(), 42130042);
-    auto script_pubkey{output.GetScriptPubkey()};
+    auto output_view{tx.GetOutput(tx.CountOutputs() - 1)};
+    BOOST_CHECK_EQUAL(output_view.GetAmount(), 42130042);
+    TransactionOutput output;
     {
         auto tx_new{Transaction{tx_data}};
-        // This is safe, becaause we now use copy assignment
-        TransactionOutput output = tx_new.GetOutput(tx_new.CountOutputs() - 1);
+        // This is safe, because we make a deep copy
+        output = tx_new.GetOutput(tx_new.CountOutputs() - 1).deep_copy();
     }
-    BOOST_CHECK_EQUAL(output.GetAmount(), 42130042);
+    BOOST_CHECK_EQUAL(output->GetAmount(), 42130042);
 }
 
 BOOST_AUTO_TEST_CASE(btck_script_verify_tests)
@@ -295,8 +295,9 @@ BOOST_AUTO_TEST_CASE(btck_script_verify_tests)
 
     // Taproot transaction 33e794d097969002ee05d336686fc03c9e15a597c1b9827669460fac98799036
     auto taproot_spent_script_pubkey{ScriptPubkey{hex_string_to_char_vec("5120339ce7e165e67d93adb3fef88a6d4beed33f01fa876f05a225242b82a631abc0")}};
-    std::vector<TransactionOutput> spent_outputs;
-    spent_outputs.emplace_back(taproot_spent_script_pubkey, 88480);
+    std::vector<TransactionOutputView> spent_outputs;
+    TransactionOutput output{taproot_spent_script_pubkey, 88480};
+    spent_outputs.emplace_back(output);
     run_verify_test(
         /*spent_script_pubkey*/ taproot_spent_script_pubkey,
         /*spending_tx*/ Transaction{hex_string_to_char_vec("01000000000101d1f1c1f8cdf6759167b90f52c9ad358a369f95284e841d7a2536cef31c0549580100000000fdffffff020000000000000000316a2f49206c696b65205363686e6f7272207369677320616e6420492063616e6e6f74206c69652e204062697462756734329e06010000000000225120a37c3903c8d0db6512e2b40b0dffa05e5a3ab73603ce8c9c4b7771e5412328f90140a60c383f71bac0ec919b1d7dbc3eb72dd56e7aa99583615564f9f99b8ae4e837b758773a5b2e4c51348854c8389f008e05029db7f464a5ff2e01d5e6e626174affd30a00")},
@@ -602,19 +603,19 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     BOOST_CHECK_EQUAL(block_spent_outputs.m_size, 1);
     RefWrapper<TransactionSpentOutputs> transaction_spent_outputs{block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.m_size - 1)};
     RefWrapper<Coin> coin{transaction_spent_outputs.Get().GetCoin(transaction_spent_outputs.Get().m_size - 1)};
-    RefWrapper<TransactionOutput> output = coin.Get().GetOutput();
+    TransactionOutputView output = coin.Get().GetOutput();
     uint32_t coin_height = coin.Get().GetConfirmationHeight();
     BOOST_CHECK_EQUAL(coin_height, 205);
-    BOOST_CHECK_EQUAL(output.Get().GetAmount(), 100000000);
-    auto script_pubkey = output.Get().GetScriptPubkey();
-    BOOST_CHECK_EQUAL(script_pubkey.Get().GetScriptPubkeyData().size(), 22);
+    BOOST_CHECK_EQUAL(output.GetAmount(), 100000000);
+    auto script_pubkey = output.GetScriptPubkey();
+    BOOST_CHECK_EQUAL(script_pubkey.GetScriptPubkeyData().size(), 22);
 
-    ScriptPubkey detached_spk{output.Get().deep_copy()};
-    BOOST_CHECK_EQUAL(detached_spk.GetScriptPubkeyData().size(), 22);
+    ScriptPubkey detached_spk{output.deep_copy()};
+    BOOST_CHECK_EQUAL(detached_spk->GetScriptPubkeyData().size(), 22);
 
     Coin coin_copy{coin.Get()};
     TransactionOutput detached_output{std::move(coin_copy)};
-    BOOST_CHECK_EQUAL(detached_output.GetAmount(), 100000000);
+    BOOST_CHECK_EQUAL(detached_output->GetAmount(), 100000000);
 
 
     // Test that reading past the size returns null data
