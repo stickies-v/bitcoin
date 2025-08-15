@@ -18,6 +18,12 @@
 namespace btck {
 
 class Coin;
+class BlockSpentOutputs;
+class BlockSpentOutputsHandle;
+class BlockSpentOutputsView;
+class TransactionSpentOutputs;
+class TransactionSpentOutputsHandle;
+class TransactionSpentOutputsView;
 class ScriptPubkeyView;
 class ScriptPubKey;
 class Transaction;
@@ -37,36 +43,58 @@ T check(T ptr)
     return ptr;
 }
 
-template <typename CT>
-struct TypeTraits;
-
-template <typename CT, typename ViewT, typename OwnedT>
-struct TraitsBase {
-    using c_t = CT;
-    using view_t = ViewT;
-    using owned_t = OwnedT;
-};
-
-template <>
-struct TypeTraits<btck_ScriptPubkey> : public TraitsBase<btck_ScriptPubkey, btck::ScriptPubkeyView, btck::ScriptPubKey> {
+struct ScriptPubkeyTraits {
+    using c_t = btck_ScriptPubkey;
+    using view_t = btck::ScriptPubkeyView;
+    using owned_t = btck::ScriptPubKey;
     static constexpr auto copy_fn = &btck_script_pubkey_copy;
     static constexpr auto destroy_fn = &btck_script_pubkey_destroy;
 };
 
-template <>
-struct TypeTraits<btck_TransactionOutput> : public TraitsBase<btck_TransactionOutput, btck::TransactionOutputView, btck::TransactionOutput> {
+struct TransactionOutputTraits {
+    using c_t = btck_TransactionOutput;
+    using view_t = btck::TransactionOutputView;
+    using owned_t = btck::TransactionOutput;
     static constexpr auto copy_fn = &btck_transaction_output_copy;
     static constexpr auto destroy_fn = &btck_transaction_output_destroy;
 };
 
+struct BlockSpentOutputsTraits {
+    using c_t = btck_BlockSpentOutputs;
+    using view_t = btck::BlockSpentOutputsView;
+    using owned_t = btck::BlockSpentOutputs;
+    using handle_c_t = btck_BlockSpentOutputsHandle;
+    using handle_t = btck::BlockSpentOutputsHandle;
+    static constexpr auto copy_fn = &btck_block_spent_outputs_copy;
+    static constexpr auto destroy_fn = &btck_block_spent_outputs_destroy;
+    static constexpr auto peek_fn = &btck_block_spent_outputs_peek;
+    static constexpr auto release_fn = &btck_block_spent_outputs_release_handle;
+};
+
+struct TransactionSpentOutputsTraits {
+    using c_t = btck_TransactionSpentOutputs;
+    using view_t = btck::TransactionSpentOutputsView;
+    using owned_t = btck::TransactionSpentOutputs;
+    using handle_c_t = btck_TransactionSpentOutputsHandle;
+    using handle_t = btck::TransactionSpentOutputsHandle;
+    static constexpr auto copy_fn = &btck_transaction_spent_outputs_copy;
+    static constexpr auto destroy_fn = &btck_transaction_spent_outputs_destroy;
+    static constexpr auto peek_fn = &btck_transaction_spent_outputs_peek;
+    static constexpr auto release_fn = &btck_transaction_spent_outputs_release_handle;
+};
+
 template <typename Traits>
-struct Deleter {
-    void operator()(Traits::c_t* ptr) const { Traits::destroy_fn(ptr); }
+struct OwnedDeleter {
+    void operator()(typename Traits::c_t* ptr) const { Traits::destroy_fn(ptr); }
+};
+
+template <typename Traits>
+struct HandleDeleter {
+    void operator()(typename Traits::handle_c_t* ptr) const { Traits::release_fn(ptr); }
 };
 
 
-// Helper struct so an OwnedBase can call ViewBase methods through
-// the -> operator.
+// Helper struct so an OwnedBase can call ViewBase methods through the -> operator.
 template <typename View>
 class ArrowProxy
 {
@@ -78,12 +106,14 @@ private:
     View m_view;
 };
 
-template <typename CType, typename Traits = TypeTraits<CType>>
+template <typename Traits>
 class ViewBase
 {
 public:
-    ViewBase(const Traits::c_t* ptr = nullptr) : m_ptr(ptr) {}
-    operator const typename Traits::c_t *() const { return m_ptr; }
+    using c_t = Traits::c_t;
+
+    ViewBase(const c_t* ptr = nullptr) : m_ptr(ptr) {}
+    operator const c_t*() const { return m_ptr; }
 
     [[nodiscard]] typename Traits::owned_t deep_copy() const
         requires requires { Traits::copy_fn; }
@@ -92,10 +122,10 @@ public:
     }
 
 protected:
-    const Traits::c_t* m_ptr;
+    const c_t* m_ptr;
 };
 
-template <typename CType, typename Traits = TypeTraits<CType>>
+template <typename Traits>
 class OwnedBase
 {
 public:
@@ -123,7 +153,39 @@ protected:
     c_t* release() { return m_ptr.release(); }
     explicit OwnedBase(Traits::c_t* ptr = nullptr) : m_ptr(ptr) {}
     ~OwnedBase() = default;
-    std::unique_ptr<c_t, Deleter<Traits>> m_ptr;
+    std::unique_ptr<c_t, OwnedDeleter<Traits>> m_ptr;
+};
+
+template <typename Traits>
+class HandleBase
+{
+public:
+    using c_t = Traits::c_t;
+    using handle_c_t = Traits::handle_c_t;
+    using view_t = Traits::view_t;
+
+    // handles can't be copied, maybe add ref() / unref() later
+    HandleBase(const HandleBase&) = delete;
+    HandleBase& operator=(const HandleBase&) = delete;
+
+    HandleBase(HandleBase&&) noexcept = default;
+    HandleBase& operator=(HandleBase&&) noexcept = default;
+
+    // ensure view constructors can only be called on l-values to avoid dangling references
+    view_t view() const& { return Traits::peek_fn(m_ptr.get()); }
+    ArrowProxy<view_t> operator->() const& { return ArrowProxy(view()); }
+    operator view_t() const& { return view(); }
+    explicit operator bool() const { return m_ptr != nullptr; }
+
+    // HandleBase should only convert to handle_c_t, not c_t (which can be accessed through ::view())
+    operator const c_t*() = delete;
+    operator handle_c_t*() { return m_ptr.get(); }
+    operator const handle_c_t*() const { return m_ptr.get(); }
+
+protected:
+    explicit HandleBase(handle_c_t* ptr = nullptr) : m_ptr(ptr) {}
+    ~HandleBase() = default;
+    std::unique_ptr<handle_c_t, HandleDeleter<Traits>> m_ptr;
 };
 
 } // namespace
@@ -148,7 +210,7 @@ public:
     }
 };
 
-class ScriptPubkeyView : public ViewBase<btck_ScriptPubkey>
+class ScriptPubkeyView : public ViewBase<ScriptPubkeyTraits>
 {
 public:
     using ViewBase::ViewBase;
@@ -169,7 +231,7 @@ public:
                btck_ScriptVerifyStatus& status) const;
 };
 
-class ScriptPubkey : public OwnedBase<btck_ScriptPubkey>
+class ScriptPubkey : public OwnedBase<ScriptPubkeyTraits>
 {
 public:
     using OwnedBase::OwnedBase;
@@ -184,7 +246,7 @@ private:
     explicit ScriptPubkey(btck_ScriptPubkey* spk) : OwnedBase(spk) {}
 };
 
-class TransactionOutputView : public ViewBase<btck_TransactionOutput>
+class TransactionOutputView : public ViewBase<TransactionOutputTraits>
 {
 public:
     using ViewBase::ViewBase;
@@ -199,7 +261,7 @@ public:
     }
 };
 
-class TransactionOutput : public OwnedBase<btck_TransactionOutput>
+class TransactionOutput : public OwnedBase<TransactionOutputTraits>
 {
 public:
     using OwnedBase::OwnedBase;
@@ -214,7 +276,7 @@ public:
     }
 
 private:
-    friend class ViewBase<btck_TransactionOutput>;
+    friend class ViewBase<TransactionOutputTraits>;
     explicit TransactionOutput(btck_TransactionOutput* ptr) : OwnedBase(ptr) {}
 };
 
@@ -669,87 +731,74 @@ TransactionOutput::TransactionOutput(Coin&& coin)
 {
 }
 
-class TransactionSpentOutputs
+class TransactionSpentOutputsView : public ViewBase<TransactionSpentOutputsTraits>
 {
-private:
-    struct Deleter {
-        void operator()(btck_TransactionSpentOutputs* ptr) const noexcept
-        {
-            btck_transaction_spent_outputs_destroy(ptr);
-        }
-    };
-
-    std::unique_ptr<btck_TransactionSpentOutputs, Deleter> m_transaction_spent_outputs;
-
 public:
-    uint64_t m_size;
-
-    TransactionSpentOutputs(btck_TransactionSpentOutputs* transaction_spent_outputs)
-        : m_transaction_spent_outputs{check(transaction_spent_outputs)},
-          m_size{btck_transaction_spent_outputs_size(transaction_spent_outputs)}
-    {
-    }
-    // Copy constructor and assignment
-    TransactionSpentOutputs(const TransactionSpentOutputs& other)
-        : m_transaction_spent_outputs{check(btck_transaction_spent_outputs_copy(other.m_transaction_spent_outputs.get()))},
-          m_size{other.m_size}
-    {
-    }
-    TransactionSpentOutputs& operator=(const TransactionSpentOutputs& other)
-    {
-        if (this != &other) {
-            m_transaction_spent_outputs.reset(check(btck_transaction_spent_outputs_copy(other.m_transaction_spent_outputs.get())));
-            m_size = btck_transaction_spent_outputs_size(m_transaction_spent_outputs.get());
-        }
-        return *this;
-    }
+    using ViewBase::ViewBase;
 
     RefWrapper<Coin> GetCoin(uint64_t index) const
     {
-        return Coin{btck_transaction_spent_outputs_get_coin_at(m_transaction_spent_outputs.get(), index)};
+        return Coin{btck_transaction_spent_outputs_get_coin_at(*this, index)};
+    }
+
+    uint64_t GetSize() const
+    {
+        return btck_transaction_spent_outputs_size(*this);
     }
 };
 
-class BlockSpentOutputs
+class TransactionSpentOutputs : public OwnedBase<TransactionSpentOutputsTraits>
 {
-private:
-    struct Deleter {
-        void operator()(btck_BlockSpentOutputs* ptr) const noexcept
-        {
-            btck_block_spent_outputs_destroy(ptr);
-        }
-    };
-
-    std::unique_ptr<btck_BlockSpentOutputs, Deleter> m_block_spent_outputs;
-
 public:
-    uint64_t m_size;
+    using OwnedBase::OwnedBase;
+};
 
-    BlockSpentOutputs(btck_BlockSpentOutputs* block_spent_outputs)
-        : m_block_spent_outputs{check(block_spent_outputs)},
-          m_size{btck_block_spent_outputs_size(block_spent_outputs)}
+class TransactionSpentOutputsHandle : public HandleBase<TransactionSpentOutputsTraits>
+{
+public:
+    using HandleBase::HandleBase;
+
+private:
+    friend class BlockSpentOutputsHandle;
+    explicit TransactionSpentOutputsHandle(handle_c_t* ptr = nullptr) : HandleBase(ptr) {}
+};
+
+class BlockSpentOutputsView : public ViewBase<BlockSpentOutputsTraits>
+{
+public:
+    using ViewBase::ViewBase;
+
+    TransactionSpentOutputsView GetTxSpentOutputs(uint64_t tx_undo_index) const
     {
+        return {btck_block_spent_outputs_get_transaction_spent_outputs_at(*this, tx_undo_index)};
     }
 
-    // Copy constructor and assignment
-    BlockSpentOutputs(const BlockSpentOutputs& other)
-        : m_block_spent_outputs{check(btck_block_spent_outputs_copy(other.m_block_spent_outputs.get()))},
-          m_size{other.m_size}
+    uint64_t GetSize() const
     {
+        return btck_block_spent_outputs_size(*this);
     }
-    BlockSpentOutputs& operator=(const BlockSpentOutputs& other)
+};
+
+class BlockSpentOutputs : public OwnedBase<BlockSpentOutputsTraits>
+{
+public:
+    using OwnedBase::OwnedBase;
+};
+
+class BlockSpentOutputsHandle : public HandleBase<BlockSpentOutputsTraits>
+{
+public:
+    using HandleBase::HandleBase;
+
+    TransactionSpentOutputsHandle GetTxSpentOutputsHandle(uint64_t tx_undo_index)
     {
-        if (this != &other) {
-            m_block_spent_outputs.reset(check(btck_block_spent_outputs_copy(other.m_block_spent_outputs.get())));
-            m_size = btck_block_spent_outputs_size(m_block_spent_outputs.get());
-        }
-        return *this;
+        return TransactionSpentOutputsHandle{
+            btck_block_spent_outputs_get_handle_transaction_spent_outputs_at(*this, tx_undo_index)};
     }
 
-    RefWrapper<TransactionSpentOutputs> GetTxSpentOutputs(uint64_t tx_undo_index) const
-    {
-        return TransactionSpentOutputs{btck_block_spent_outputs_get_transaction_spent_outputs_at(m_block_spent_outputs.get(), tx_undo_index)};
-    }
+private:
+    friend class ChainMan;
+    explicit BlockSpentOutputsHandle(handle_c_t* ptr = nullptr) : HandleBase(ptr) {}
 };
 
 class BlockIndex
@@ -865,9 +914,10 @@ public:
         return block;
     }
 
-    BlockSpentOutputs ReadBlockSpentOutputs(const BlockIndex& block_index) const
+    BlockSpentOutputsHandle GetBlockSpentOutputsHandle(const BlockIndex& block_index) const
     {
-        return btck_block_spent_outputs_read(m_chainman, block_index.m_block_index.get());
+        return BlockSpentOutputsHandle{btck_get_handle_block_spent_outputs(
+            m_chainman, block_index.m_block_index.get())};
     }
 
     ~ChainMan()

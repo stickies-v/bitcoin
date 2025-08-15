@@ -599,16 +599,21 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     auto read_block_2 = chainman->ReadBlock(tip_2).value();
     check_equal(read_block_2.GetBlockData(), REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 2]);
 
-    BlockSpentOutputs block_spent_outputs{chainman->ReadBlockSpentOutputs(tip)};
-    BOOST_CHECK_EQUAL(block_spent_outputs.m_size, 1);
-    RefWrapper<TransactionSpentOutputs> transaction_spent_outputs{block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.m_size - 1)};
-    RefWrapper<Coin> coin{transaction_spent_outputs.Get().GetCoin(transaction_spent_outputs.Get().m_size - 1)};
+    BlockSpentOutputsHandle block_spent_handle{chainman->GetBlockSpentOutputsHandle(tip)};
+    const uint64_t block_spent_size{block_spent_handle->GetSize()};
+    BOOST_CHECK_EQUAL(block_spent_size, 1);
+    TransactionSpentOutputsView transaction_spent_view{block_spent_handle->GetTxSpentOutputs(block_spent_size - 1)};
+    RefWrapper<Coin> coin{transaction_spent_view.GetCoin(transaction_spent_view.GetSize() - 1)};
     TransactionOutputView output = coin.Get().GetOutput();
     uint32_t coin_height = coin.Get().GetConfirmationHeight();
     BOOST_CHECK_EQUAL(coin_height, 205);
     BOOST_CHECK_EQUAL(output.GetAmount(), 100000000);
     auto script_pubkey = output.GetScriptPubkey();
     BOOST_CHECK_EQUAL(script_pubkey.GetScriptPubkeyData().size(), 22);
+
+    // Check that handle and view lead to same result
+    TransactionSpentOutputsHandle transaction_spent_handle{block_spent_handle.GetTxSpentOutputsHandle(block_spent_size - 1)};
+    BOOST_CHECK_EQUAL(transaction_spent_handle->GetCoin(transaction_spent_handle->GetSize() - 1).Get().GetOutput().GetAmount(), 100000000);
 
     ScriptPubkey detached_spk{output.deep_copy()};
     BOOST_CHECK_EQUAL(detached_spk->GetScriptPubkeyData().size(), 22);

@@ -302,12 +302,30 @@ struct ChainstateManagerOptions {
     }
 };
 
+// helper struct for peek
+template <typename Handle>
+struct Borrowed;
+
 template <typename To, typename From>
 To* cast(From* from)
 {
     assert(from);
     return reinterpret_cast<To*>(from);
 }
+
+// CBlockUndo <-> btck_BlockSpendOutputs
+btck_BlockSpentOutputs* to_opaq(CBlockUndo* block) { return cast<btck_BlockSpentOutputs>(block); }
+CBlockUndo* to_impl(btck_BlockSpentOutputs* block) { return cast<CBlockUndo>(block); }
+const CBlockUndo* to_impl(const btck_BlockSpentOutputs* block) { return cast<const CBlockUndo>(block); }
+
+std::shared_ptr<CBlockUndo>* to_impl(btck_BlockSpentOutputsHandle* block) { return cast<std::shared_ptr<CBlockUndo>>(block); }
+const std::shared_ptr<CBlockUndo>* to_impl(const btck_BlockSpentOutputsHandle* block) { return cast<const std::shared_ptr<CBlockUndo>>(block); }
+btck_BlockSpentOutputsHandle* to_opaq(std::shared_ptr<CBlockUndo>* block) { return cast<btck_BlockSpentOutputsHandle>(block); }
+
+template <>
+struct Borrowed<btck_BlockSpentOutputsHandle> {
+    using type = btck_BlockSpentOutputs;
+};
 
 // CScript <-> btck_Script
 CScript* to_impl(btck_ScriptPubkey* spk) { return cast<CScript>(spk); }
@@ -319,6 +337,34 @@ const btck_ScriptPubkey* to_opaq(const CScript* script) { return cast<const btck
 CTxOut* to_impl(btck_TransactionOutput* output) { return cast<CTxOut>(output); }
 const CTxOut* to_impl(const btck_TransactionOutput* output) { return cast<const CTxOut>(output); }
 btck_TransactionOutput* to_opaq(CTxOut* output) { return cast<btck_TransactionOutput>(output); }
+
+// CTxUndo <-> btck_TransactionSpentOutputs
+CTxUndo* to_impl(btck_TransactionSpentOutputs* tx_undo) { return cast<CTxUndo>(tx_undo); }
+const CTxUndo* to_impl(const btck_TransactionSpentOutputs* tx_undo) { return cast<const CTxUndo>(tx_undo); }
+btck_TransactionSpentOutputs* to_opaq(CTxUndo* tx_undo) { return cast<btck_TransactionSpentOutputs>(tx_undo); }
+const btck_TransactionSpentOutputs* to_opaq(const CTxUndo* tx_undo) { return cast<const btck_TransactionSpentOutputs>(tx_undo); }
+
+const std::shared_ptr<CTxUndo>* to_impl(const btck_TransactionSpentOutputsHandle* tx_undo) { return cast<const std::shared_ptr<CTxUndo>>(tx_undo); }
+btck_TransactionSpentOutputsHandle* to_opaq(std::shared_ptr<CTxUndo>* tx_undo) { return cast<btck_TransactionSpentOutputsHandle>(tx_undo); }
+
+template <>
+struct Borrowed<btck_TransactionSpentOutputsHandle> {
+    using type = btck_TransactionSpentOutputs;
+};
+
+template <typename Handle>
+const Borrowed<Handle>::type* peek(const Handle* handle)
+{
+    return to_opaq(to_impl(handle)->get());
+}
+
+template <typename T>
+void release_handle(T* handle)
+{
+    if (!handle) return;
+    delete to_impl(handle);
+    handle = nullptr;
+}
 
 const BlockValidationState* cast_block_validation_state(const btck_BlockValidationState* block_validation_state)
 {
@@ -381,20 +427,9 @@ struct btck_Block
     std::shared_ptr<CBlock> m_block;
 };
 
-struct btck_BlockSpentOutputs
-{
-    std::shared_ptr<CBlockUndo> m_block_undo;
-};
-
-struct btck_TransactionSpentOutputs
-{
-    CTxUndo* m_tx_undo;
-    bool m_owned;
-};
-
 struct btck_Coin
 {
-    Coin* m_coin;
+    const Coin* m_coin;
     bool m_owned;
 };
 
@@ -1046,7 +1081,7 @@ btck_Block* btck_block_read( btck_ChainstateManager* chainman, const btck_BlockI
     return new btck_Block{std::move(block)};;
 }
 
-btck_BlockSpentOutputs* btck_block_spent_outputs_read(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
+static std::unique_ptr<CBlockUndo> get_block_undo_helper(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
 {
     const auto block_index{cast_const_block_index(block_index_)};
 
@@ -1054,12 +1089,36 @@ btck_BlockSpentOutputs* btck_block_spent_outputs_read(btck_ChainstateManager* ch
         LogDebug(BCLog::KERNEL, "The genesis block does not have any spent outputs.");
         return nullptr;
     }
-    auto block_undo{std::make_shared<CBlockUndo>()};
+    auto block_undo{std::make_unique<CBlockUndo>()};
     if (!chainman->m_chainman->m_blockman.ReadBlockUndo(*block_undo, *block_index)) {
         LogError("Failed to read block spent outputs data.");
         return nullptr;
     }
-    return new btck_BlockSpentOutputs{std::move(block_undo)};
+    return block_undo;
+}
+
+btck_BlockSpentOutputs* btck_get_block_spent_outputs(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
+{
+    return to_opaq(get_block_undo_helper(chainman, block_index).release());
+}
+
+btck_BlockSpentOutputsHandle* btck_get_handle_block_spent_outputs(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
+{
+    auto block_undo{get_block_undo_helper(chainman, block_index)};
+    auto handle{new std::shared_ptr<CBlockUndo>(std::move(block_undo))};
+    return to_opaq(handle);
+}
+
+const btck_BlockSpentOutputs* btck_block_spent_outputs_peek(const btck_BlockSpentOutputsHandle* block)
+{
+    return peek(block);
+}
+
+void btck_block_spent_outputs_release_handle(btck_BlockSpentOutputsHandle* block)
+{
+    if (!block) return;
+    delete to_impl(block);
+    block = nullptr;
 }
 
 void btck_block_index_destroy(btck_BlockIndex* block_index)
@@ -1070,53 +1129,82 @@ void btck_block_index_destroy(btck_BlockIndex* block_index)
 
 btck_BlockSpentOutputs* btck_block_spent_outputs_copy(const btck_BlockSpentOutputs* block_spent_outputs)
 {
-    return new btck_BlockSpentOutputs{block_spent_outputs->m_block_undo};
+    assert(block_spent_outputs);
+    return to_opaq(new CBlockUndo{*to_impl(block_spent_outputs)});
 }
 
 uint64_t btck_block_spent_outputs_size(const btck_BlockSpentOutputs* block_spent_outputs)
 {
-    return block_spent_outputs->m_block_undo->vtxundo.size();
+    assert(block_spent_outputs);
+    return to_impl(block_spent_outputs)->vtxundo.size();
 }
 
-btck_TransactionSpentOutputs* btck_block_spent_outputs_get_transaction_spent_outputs_at(const btck_BlockSpentOutputs* block_spent_outputs, uint64_t transaction_index)
+const btck_TransactionSpentOutputs* btck_block_spent_outputs_get_transaction_spent_outputs_at(
+    const btck_BlockSpentOutputs* block_spent_outputs,
+    uint64_t transaction_index)
 {
-    assert(transaction_index < block_spent_outputs->m_block_undo->vtxundo.size());
-    auto* tx_undo{&block_spent_outputs->m_block_undo->vtxundo.at(transaction_index)};
-    return new btck_TransactionSpentOutputs{tx_undo, false};
+    const auto* bso{to_impl(block_spent_outputs)};
+    assert(transaction_index < bso->vtxundo.size());
+
+    const auto* tx_undo{&bso->vtxundo.at(transaction_index)};
+    return to_opaq(tx_undo);
+}
+
+btck_TransactionSpentOutputsHandle* btck_block_spent_outputs_get_handle_transaction_spent_outputs_at(
+    btck_BlockSpentOutputsHandle* block_spent_outputs,
+    uint64_t transaction_index)
+{
+    auto bso{*to_impl(block_spent_outputs)};
+    assert(transaction_index < bso->vtxundo.size());
+
+    auto* tx_undo{&bso->vtxundo.at(transaction_index)};
+    auto handle{new std::shared_ptr<CTxUndo>(bso, tx_undo)};
+
+    return to_opaq(handle);
 }
 
 void btck_block_spent_outputs_destroy(btck_BlockSpentOutputs* block_spent_outputs)
 {
     if (!block_spent_outputs) return;
-    delete block_spent_outputs;
+    delete to_impl(block_spent_outputs);
     block_spent_outputs = nullptr;
 }
 
 btck_TransactionSpentOutputs* btck_transaction_spent_outputs_copy(const btck_TransactionSpentOutputs* transaction_spent_outputs)
 {
-    return new btck_TransactionSpentOutputs{new CTxUndo{*transaction_spent_outputs->m_tx_undo}, true};
+    return to_opaq(new CTxUndo{*to_impl(transaction_spent_outputs)});
 }
 
 uint64_t btck_transaction_spent_outputs_size(const btck_TransactionSpentOutputs* transaction_spent_outputs)
 {
-    return transaction_spent_outputs->m_tx_undo->vprevout.size();
+    return to_impl(transaction_spent_outputs)->vprevout.size();
 }
 
 void btck_transaction_spent_outputs_destroy(btck_TransactionSpentOutputs* transaction_spent_outputs)
 {
     if (!transaction_spent_outputs) return;
-    if (transaction_spent_outputs->m_owned) {
-        delete transaction_spent_outputs->m_tx_undo;
-    }
-    delete transaction_spent_outputs;
+    delete to_impl(transaction_spent_outputs);
     transaction_spent_outputs = nullptr;
+}
+
+const btck_TransactionSpentOutputs* btck_transaction_spent_outputs_peek(
+    const btck_TransactionSpentOutputsHandle* handle)
+{
+    return peek(handle);
+}
+
+void btck_transaction_spent_outputs_release_handle(
+    btck_TransactionSpentOutputsHandle* handle)
+{
+    release_handle(handle);
 }
 
 btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, uint64_t coin_index)
 {
-    assert(coin_index < transaction_spent_outputs->m_tx_undo->vprevout.size());
-    Coin* coin{&transaction_spent_outputs->m_tx_undo->vprevout.at(coin_index)};
-    return new btck_Coin{coin, false};
+    const auto* outputs{to_impl(transaction_spent_outputs)};
+    assert(coin_index < outputs->vprevout.size());
+    const Coin& coin{outputs->vprevout.at(coin_index)};
+    return new btck_Coin{&coin, false};
 }
 
 btck_Coin* btck_coin_copy(const btck_Coin* coin)

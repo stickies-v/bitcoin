@@ -229,6 +229,12 @@ typedef struct btck_BlockValidationState btck_BlockValidationState;
 typedef struct btck_BlockSpentOutputs btck_BlockSpentOutputs;
 
 /**
+ * Opaque struct to ensure the lifetime of a btck_BlockSpentOutputs
+ * without having to do a deep copy.
+ */
+typedef struct btck_BlockSpentOutputsHandle btck_BlockSpentOutputsHandle;
+
+/**
  * Opaque data structure for holding a transaction's spent outputs.
  *
  * Holds the coins consumed by a certain transaction. Retrieved through the
@@ -236,6 +242,12 @@ typedef struct btck_BlockSpentOutputs btck_BlockSpentOutputs;
  * transaction's inputs consuming them.
  */
 typedef struct btck_TransactionSpentOutputs btck_TransactionSpentOutputs;
+
+/**
+ * Opaque struct to ensure the lifetime of a btck_TransactionSpentOutputs
+ * without having to do a deep copy.
+ */
+typedef struct btck_TransactionSpentOutputsHandle btck_TransactionSpentOutputsHandle;
 
 /**
  * Opaque data structure for holding a coin.
@@ -1207,10 +1219,15 @@ BITCOINKERNEL_API void btck_block_index_destroy(btck_BlockIndex* block_index);
  * @param[in] block_index        Non-null.
  * @return                       The read out block spent outputs, or null on error.
  */
-BITCOINKERNEL_API btck_BlockSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_read(
+BITCOINKERNEL_API btck_BlockSpentOutputsHandle* BITCOINKERNEL_WARN_UNUSED_RESULT btck_get_handle_block_spent_outputs(
     btck_ChainstateManager* chainstate_manager,
-    const btck_BlockIndex* block_index
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
+
+BITCOINKERNEL_API const btck_BlockSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_peek(
+    const btck_BlockSpentOutputsHandle*) BITCOINKERNEL_ARG_NONNULL(1);
+
+BITCOINKERNEL_API void btck_block_spent_outputs_release_handle(
+    btck_BlockSpentOutputsHandle*) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Copy a block's spent outputs.
@@ -1242,8 +1259,12 @@ BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_out
  * @param[in] transaction_spent_outputs_index The index of the transaction spent outputs within the block spent outputs.
  * @return                                    A transaction spent outputs pointer.
  */
-BITCOINKERNEL_API btck_TransactionSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_get_transaction_spent_outputs_at(
+BITCOINKERNEL_API const btck_TransactionSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_get_transaction_spent_outputs_at(
     const btck_BlockSpentOutputs* block_spent_outputs,
+    uint64_t transaction_spent_outputs_index) BITCOINKERNEL_ARG_NONNULL(1);
+
+BITCOINKERNEL_API btck_TransactionSpentOutputsHandle* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_get_handle_transaction_spent_outputs_at(
+    btck_BlockSpentOutputsHandle* block_spent_outputs,
     uint64_t transaction_spent_outputs_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
@@ -1297,6 +1318,12 @@ BITCOINKERNEL_API btck_Coin* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_s
  * Destroy the transaction spent outputs.
  */
 BITCOINKERNEL_API void btck_transaction_spent_outputs_destroy(btck_TransactionSpentOutputs* transaction_spent_outputs);
+
+BITCOINKERNEL_API const btck_TransactionSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_spent_outputs_peek(
+    const btck_TransactionSpentOutputsHandle*) BITCOINKERNEL_ARG_NONNULL(1);
+
+BITCOINKERNEL_API void btck_transaction_spent_outputs_release_handle(
+    btck_TransactionSpentOutputsHandle*) BITCOINKERNEL_ARG_NONNULL(1);
 
 ///@}
 
