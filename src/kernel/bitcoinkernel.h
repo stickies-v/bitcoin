@@ -1122,9 +1122,8 @@ BITCOINKERNEL_API btck_BlockValidationResult btck_block_validation_state_get_blo
  * @param[in] chainstate_manager Non-null.
  * @return                       The block index of the current tip, or null if the chain is empty.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_tip(
-    btck_ChainstateManager* chainstate_manager
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_tip(
+    btck_ChainstateManager* chainstate_manager) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Get the block index entry of the genesis block.
@@ -1132,9 +1131,8 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
  * @param[in] chainstate_manager Non-null.
  * @return                       The block index of the genesis block, or null on error.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_genesis(
-    btck_ChainstateManager* chainstate_manager
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_genesis(
+    btck_ChainstateManager* chainstate_manager) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Retrieve a block index by its block hash.
@@ -1144,10 +1142,9 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
  * @return                       The block index of the block with the passed in hash, or null if
  *                               the block hash is not found.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_by_hash(
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_by_hash(
     btck_ChainstateManager* chainstate_manager,
-    btck_BlockHash* block_hash
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    btck_BlockHash* block_hash) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
  * @brief Retrieve a block index by its height in the currently active chain.
@@ -1158,10 +1155,9 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
  * @return                       The block index at a certain height in the currently active chain,
  *                               or null if the height is out of bounds.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_by_height(
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_by_height(
     btck_ChainstateManager* chainstate_manager,
-    int block_height
-) BITCOINKERNEL_ARG_NONNULL(1);
+    int block_height) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Return the next block index in the currently active chain, or null if
@@ -1173,10 +1169,9 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
  * @return                       The next block index in the currently active chain, or null if
  *                               the block_index is the chain tip.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_next(
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_next(
     btck_ChainstateManager* chainstate_manager,
-    const btck_BlockIndex* block_index
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
  * @brief Returns the previous block index in the chain, or null if the current
@@ -1185,9 +1180,8 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
  * @param[in] block_index Non-null.
  * @return                The previous block index, or null on error or if the current block index is the genesis block.
  */
-BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_previous(
-    const btck_BlockIndex* block_index
-) BITCOINKERNEL_ARG_NONNULL(1);
+BITCOINKERNEL_API const btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_previous(
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Return the height of a certain block index.
@@ -1198,12 +1192,6 @@ BITCOINKERNEL_API btck_BlockIndex* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_i
 BITCOINKERNEL_API int32_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_index_get_height(
     const btck_BlockIndex* block_index
 ) BITCOINKERNEL_ARG_NONNULL(1);
-
-
-/**
- * @brief Destroy the block index.
- */
-BITCOINKERNEL_API void btck_block_index_destroy(btck_BlockIndex* block_index);
 
 ///@}
 

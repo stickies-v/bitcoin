@@ -20,6 +20,8 @@ namespace btck {
 class Block;
 class BlockHandle;
 class BlockView;
+class BlockIndex;
+class BlockIndexView;
 class Coin;
 class CoinView;
 class BlockSpentOutputs;
@@ -57,6 +59,12 @@ struct BlockTraits {
     static constexpr auto destroy_fn = &btck_block_destroy;
     static constexpr auto peek_fn = &btck_block_peek;
     static constexpr auto release_fn = &btck_block_release_handle;
+};
+
+struct BlockIndexTraits {
+    using c_t = btck_BlockIndex;
+    using view_t = btck::BlockIndexView;
+    using owned_t = btck::BlockIndex;
 };
 
 struct CoinTraits {
@@ -798,45 +806,35 @@ private:
     friend class ChainMan;
 };
 
-class BlockIndex
+class BlockIndexView : public ViewBase<BlockIndexTraits>
 {
-private:
-    struct Deleter {
-        void operator()(btck_BlockIndex* ptr) const noexcept
-        {
-            btck_block_index_destroy(ptr);
-        }
-    };
-
-    std::unique_ptr<btck_BlockIndex, Deleter> m_block_index;
 
 public:
-    BlockIndex(btck_BlockIndex* block_index) : m_block_index{check(block_index)} {}
-
-    std::optional<BlockIndex> GetPreviousBlockIndex() const
+    using ViewBase::ViewBase;
+    std::optional<BlockIndexView> GetPreviousBlockIndex() const
     {
-        if (!m_block_index) {
+        if (!*this) {
             return std::nullopt;
         }
-        auto index{btck_block_index_get_previous(m_block_index.get())};
+        auto index{btck_block_index_get_previous(*this)};
         if (!index) return std::nullopt;
         return index;
     }
 
     int32_t GetHeight() const
     {
-        if (!m_block_index) {
+        if (!*this) {
             return -1;
         }
-        return btck_block_index_get_height(m_block_index.get());
+        return btck_block_index_get_height(*this);
     }
 
     std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
     {
-        if (!m_block_index) {
+        if (!*this) {
             return nullptr;
         }
-        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_index_get_block_hash(m_block_index.get()));
+        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_index_get_block_hash(*this));
     }
 
     friend class ChainMan;
@@ -875,58 +873,58 @@ public:
         return btck_chainstate_manager_process_block(m_chainman, block, new_block);
     }
 
-    BlockIndex GetBlockIndexFromTip() const
+    BlockIndexView GetBlockIndexFromTip() const
     {
         return btck_block_index_get_tip(m_chainman);
     }
 
-    BlockIndex GetBlockIndexFromGenesis() const
+    BlockIndexView GetBlockIndexFromGenesis() const
     {
         return btck_block_index_get_genesis(m_chainman);
     }
 
-    BlockIndex GetBlockIndexByHash(btck_BlockHash* block_hash) const
+    BlockIndexView GetBlockIndexByHash(btck_BlockHash* block_hash) const
     {
         return btck_block_index_get_by_hash(m_chainman, block_hash);
     }
 
-    std::optional<BlockIndex> GetBlockIndexByHeight(int height) const
+    std::optional<BlockIndexView> GetBlockIndexByHeight(int height) const
     {
         auto index{btck_block_index_get_by_height(m_chainman, height)};
         if (!index) return std::nullopt;
         return index;
     }
 
-    std::optional<BlockIndex> GetNextBlockIndex(BlockIndex& block_index) const
+    std::optional<BlockIndexView> GetNextBlockIndex(BlockIndexView& block_index) const
     {
-        auto index{btck_block_index_get_next(m_chainman, block_index.m_block_index.get())};
+        auto index{btck_block_index_get_next(m_chainman, block_index)};
         if (!index) return std::nullopt;
         return index;
     }
 
-    std::optional<Block> ReadBlock(const BlockIndex& block_index) const
+    std::optional<Block> ReadBlock(const BlockIndexView& block_index) const
     {
-        auto* block{btck_read_block(m_chainman, block_index.m_block_index.get())};
+        auto* block{btck_read_block(m_chainman, block_index)};
         if (!block) return std::nullopt;
         return Block{block};
     }
 
-    std::optional<BlockHandle> ReadBlockHandle(const BlockIndex& block_index) const
+    std::optional<BlockHandle> ReadBlockHandle(const BlockIndexView& block_index) const
     {
-        auto* block{btck_read_handle_block(m_chainman, block_index.m_block_index.get())};
+        auto* block{btck_read_handle_block(m_chainman, block_index)};
         if (!block) return std::nullopt;
         return BlockHandle{block};
     }
 
-    BlockSpentOutputs GetBlockSpentOutputs(const BlockIndex& block_index) const
+    BlockSpentOutputs GetBlockSpentOutputs(const BlockIndexView& block_index) const
     {
-        return BlockSpentOutputs{btck_get_block_spent_outputs(m_chainman, block_index.m_block_index.get())};
+        return BlockSpentOutputs{btck_get_block_spent_outputs(m_chainman, block_index)};
     }
 
-    BlockSpentOutputsHandle GetBlockSpentOutputsHandle(const BlockIndex& block_index) const
+    BlockSpentOutputsHandle GetBlockSpentOutputsHandle(const BlockIndexView& block_index) const
     {
         return BlockSpentOutputsHandle{btck_get_handle_block_spent_outputs(
-            m_chainman, block_index.m_block_index.get())};
+            m_chainman, block_index)};
     }
 
     ~ChainMan()

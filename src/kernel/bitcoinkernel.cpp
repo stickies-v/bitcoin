@@ -326,6 +326,10 @@ struct Borrowed<btck_BlockHandle> {
     using type = btck_Block;
 };
 
+// CBlockIndex <-> btck_BlockIndex
+const CBlockIndex* to_impl(const btck_BlockIndex* ptr) { return cast<const CBlockIndex>(ptr); }
+const btck_BlockIndex* to_opaq(const CBlockIndex* ptr) { return cast<const btck_BlockIndex>(ptr); }
+
 // CBlockUndo <-> btck_BlockSpendOutputs
 btck_BlockSpentOutputs* to_opaq(CBlockUndo* block) { return cast<btck_BlockSpentOutputs>(block); }
 CBlockUndo* to_impl(btck_BlockSpentOutputs* block) { return cast<CBlockUndo>(block); }
@@ -391,12 +395,6 @@ const BlockValidationState* cast_block_validation_state(const btck_BlockValidati
 {
     assert(block_validation_state);
     return reinterpret_cast<const BlockValidationState*>(block_validation_state);
-}
-
-const CBlockIndex* cast_const_block_index(const btck_BlockIndex* index)
-{
-    assert(index);
-    return reinterpret_cast<const CBlockIndex*>(index);
 }
 
 } // namespace
@@ -1018,28 +1016,28 @@ void btck_block_destroy(btck_Block* block)
     block = nullptr;
 }
 
-btck_BlockIndex* btck_block_index_get_tip(btck_ChainstateManager* chainman)
+const btck_BlockIndex* btck_block_index_get_tip(btck_ChainstateManager* chainman)
 {
-    return reinterpret_cast<btck_BlockIndex*>(WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Tip()));
+    return to_opaq(WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Tip()));
 }
 
-btck_BlockIndex* btck_block_index_get_genesis(btck_ChainstateManager* chainman)
+const btck_BlockIndex* btck_block_index_get_genesis(btck_ChainstateManager* chainman)
 {
-    return reinterpret_cast<btck_BlockIndex*>(WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Genesis()));
+    return to_opaq(WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Genesis()));
 }
 
-btck_BlockIndex* btck_block_index_get_by_hash(btck_ChainstateManager* chainman, btck_BlockHash* block_hash)
+const btck_BlockIndex* btck_block_index_get_by_hash(btck_ChainstateManager* chainman, btck_BlockHash* block_hash)
 {
     auto hash = uint256{std::span<const unsigned char>{(*block_hash).hash, 32}};
-    auto block_index = WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->m_blockman.LookupBlockIndex(hash));
+    const auto* block_index = WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->m_blockman.LookupBlockIndex(hash));
     if (!block_index) {
         LogDebug(BCLog::KERNEL, "A block with the given hash is not indexed.");
         return nullptr;
     }
-    return reinterpret_cast<btck_BlockIndex*>(block_index);
+    return to_opaq(block_index);
 }
 
-btck_BlockIndex* btck_block_index_get_by_height(btck_ChainstateManager* chainman, int height)
+const btck_BlockIndex* btck_block_index_get_by_height(btck_ChainstateManager* chainman, int height)
 {
     LOCK(chainman->m_chainman->GetMutex());
 
@@ -1047,37 +1045,37 @@ btck_BlockIndex* btck_block_index_get_by_height(btck_ChainstateManager* chainman
         LogDebug(BCLog::KERNEL, "Block height is out of range.");
         return nullptr;
     }
-    return reinterpret_cast<btck_BlockIndex*>(chainman->m_chainman->ActiveChain()[height]);
+    return to_opaq(chainman->m_chainman->ActiveChain()[height]);
 }
 
-btck_BlockIndex* btck_block_index_get_next(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
+const btck_BlockIndex* btck_block_index_get_next(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
 {
-    const auto block_index{cast_const_block_index(block_index_)};
+    const auto* block_index{to_impl(block_index_)};
 
-    auto next_block_index{WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Next(block_index))};
+    const auto* next_block_index{WITH_LOCK(chainman->m_chainman->GetMutex(), return chainman->m_chainman->ActiveChain().Next(block_index))};
 
     if (!next_block_index) {
         LogTrace(BCLog::KERNEL, "The block index is the tip of the current chain, it does not have a next.");
     }
 
-    return reinterpret_cast<btck_BlockIndex*>(next_block_index);
+    return to_opaq(next_block_index);
 }
 
-btck_BlockIndex* btck_block_index_get_previous(const btck_BlockIndex* block_index_)
+const btck_BlockIndex* btck_block_index_get_previous(const btck_BlockIndex* block_index_)
 {
-    const CBlockIndex* block_index{cast_const_block_index(block_index_)};
+    const CBlockIndex* block_index{to_impl(block_index_)};
 
     if (!block_index->pprev) {
         LogTrace(BCLog::KERNEL, "The block index is the genesis, it has no previous.");
         return nullptr;
     }
 
-    return reinterpret_cast<btck_BlockIndex*>(block_index->pprev);
+    return to_opaq(block_index->pprev);
 }
 
 static std::unique_ptr<CBlock> read_block_from_disk_helper(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
 {
-    const CBlockIndex* block_index{cast_const_block_index(block_index_)};
+    const CBlockIndex* block_index{to_impl(block_index_)};
 
     auto block = std::make_unique<CBlock>();
     if (!chainman->m_chainman->m_blockman.ReadBlock(*block, *block_index)) {
@@ -1103,7 +1101,7 @@ btck_BlockHandle* btck_read_handle_block(btck_ChainstateManager* chainman, const
 
 static std::unique_ptr<CBlockUndo> get_block_undo_helper(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
 {
-    const auto block_index{cast_const_block_index(block_index_)};
+    const auto* block_index{to_impl(block_index_)};
 
     if (block_index->nHeight < 1) {
         LogDebug(BCLog::KERNEL, "The genesis block does not have any spent outputs.");
@@ -1139,12 +1137,6 @@ void btck_block_spent_outputs_release_handle(btck_BlockSpentOutputsHandle* block
     if (!block) return;
     delete to_impl(block);
     block = nullptr;
-}
-
-void btck_block_index_destroy(btck_BlockIndex* block_index)
-{
-    // This is just a dummy function. The user does not control block index memory.
-    return;
 }
 
 btck_BlockSpentOutputs* btck_block_spent_outputs_copy(const btck_BlockSpentOutputs* block_spent_outputs)
@@ -1231,15 +1223,14 @@ btck_Coin* btck_coin_copy(const btck_Coin* coin)
     return to_opaq(new Coin{*to_impl(coin)});
 }
 
-int32_t btck_block_index_get_height(const btck_BlockIndex* block_index_)
+int32_t btck_block_index_get_height(const btck_BlockIndex* block_index)
 {
-    auto block_index{cast_const_block_index(block_index_)};
-    return block_index->nHeight;
+    return to_impl(block_index)->nHeight;
 }
 
 btck_BlockHash* btck_block_index_get_block_hash(const btck_BlockIndex* block_index_)
 {
-    auto block_index{cast_const_block_index(block_index_)};
+    const auto* block_index{to_impl(block_index_)};
     if (block_index->phashBlock == nullptr) {
         return nullptr;
     }
