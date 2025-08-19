@@ -440,20 +440,20 @@ void chainman_reindex_test(TestDirectory& test_directory)
 
     // Sanity check some block retrievals
     auto genesis_index{chainman->GetBlockIndexFromGenesis()};
-    auto genesis_block_raw{chainman->ReadBlock(genesis_index).value().GetBlockData()};
+    auto genesis_block_raw{chainman->ReadBlock(genesis_index).value()->GetBlockData()};
     auto first_index{chainman->GetBlockIndexByHeight(0).value()};
-    auto first_block_raw{chainman->ReadBlock(genesis_index).value().GetBlockData()};
+    auto first_block_raw{chainman->ReadBlock(genesis_index).value()->GetBlockData()};
     check_equal(genesis_block_raw, first_block_raw);
     auto height{first_index.GetHeight()};
     BOOST_CHECK_EQUAL(height, 0);
 
     auto next_index{chainman->GetNextBlockIndex(first_index).value()};
-    auto next_block_data{chainman->ReadBlock(next_index).value().GetBlockData()};
+    auto next_block_data{chainman->ReadBlock(next_index).value()->GetBlockData()};
     auto tip_index{chainman->GetBlockIndexFromTip()};
-    auto tip_block_data{chainman->ReadBlock(tip_index).value().GetBlockData()};
+    auto tip_block_data{chainman->ReadBlock(tip_index).value()->GetBlockData()};
     auto second_index{chainman->GetBlockIndexByHeight(1).value()};
     auto second_block{chainman->ReadBlock(second_index).value()};
-    auto second_block_data{second_block.GetBlockData()};
+    auto second_block_data{second_block->GetBlockData()};
     auto second_height{second_index.GetHeight()};
     BOOST_CHECK_EQUAL(second_height, 1);
     check_equal(next_block_data, tip_block_data);
@@ -462,7 +462,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
     auto hash{second_index.GetHash()};
     auto another_second_index{chainman->GetBlockIndexByHash(hash.get())};
     auto another_second_height{another_second_index.GetHeight()};
-    auto block_hash{second_block.GetHash()};
+    auto block_hash{second_block->GetHash()};
     BOOST_CHECK(std::equal(std::begin(block_hash->hash), std::end(block_hash->hash), std::begin(hash->hash)));
     BOOST_CHECK_EQUAL(second_height, another_second_height);
 }
@@ -498,11 +498,11 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
 
     // mainnet block 1
     auto raw_block = hex_string_to_char_vec("010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000");
-    Block block{raw_block};
-    Transaction tx{block.GetTransaction(block.CountOutputs() - 1)};
+    BlockHandle block{raw_block};
+    Transaction tx{block->GetTransaction(block->CountOutputs() - 1)};
 
     validation_interface.m_expected_valid_block.emplace(raw_block);
-    check_equal(block.GetBlockData(), raw_block);
+    check_equal(block->GetBlockData(), raw_block);
     bool new_block = false;
     BOOST_CHECK(chainman->ProcessBlock(block, &new_block));
     BOOST_CHECK(new_block);
@@ -510,7 +510,7 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     auto tip{chainman->GetBlockIndexFromTip()};
     auto read_block{chainman->ReadBlock(tip)};
     BOOST_REQUIRE(read_block);
-    check_equal(read_block.value().GetBlockData(), raw_block);
+    check_equal(read_block.value()->GetBlockData(), raw_block);
 
     // Check that we can read the previous block
     auto tip_2{tip.GetPreviousBlockIndex()};
@@ -550,7 +550,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_in_memory_tests)
     auto chainman{create_chainman(in_memory_test_directory, false, false, true, true, context)};
 
     for (auto& raw_block : REGTEST_BLOCK_DATA) {
-        Block block{raw_block};
+        BlockHandle block{raw_block};
         bool new_block{false};
         chainman->ProcessBlock(block, &new_block);
         BOOST_CHECK(new_block);
@@ -575,7 +575,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     {
         auto chainman{create_chainman(test_directory, false, false, false, false, context)};
         for (size_t i{0}; i < mid; i++) {
-            Block block{REGTEST_BLOCK_DATA[i]};
+            BlockHandle block{REGTEST_BLOCK_DATA[i]};
             bool new_block{false};
             BOOST_CHECK(chainman->ProcessBlock(block, &new_block));
             BOOST_CHECK(new_block);
@@ -585,7 +585,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     auto chainman{create_chainman(test_directory, false, false, false, false, context)};
 
     for (size_t i{mid}; i < REGTEST_BLOCK_DATA.size(); i++) {
-        Block block{REGTEST_BLOCK_DATA[i]};
+        BlockHandle block{REGTEST_BLOCK_DATA[i]};
         bool new_block{false};
         BOOST_CHECK(chainman->ProcessBlock(block, &new_block));
         BOOST_CHECK(new_block);
@@ -593,11 +593,11 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
 
     auto tip = chainman->GetBlockIndexFromTip();
     auto read_block = chainman->ReadBlock(tip).value();
-    check_equal(read_block.GetBlockData(), REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 1]);
+    check_equal(read_block->GetBlockData(), REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 1]);
 
     auto tip_2 = tip.GetPreviousBlockIndex().value();
     auto read_block_2 = chainman->ReadBlock(tip_2).value();
-    check_equal(read_block_2.GetBlockData(), REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 2]);
+    check_equal(read_block_2->GetBlockData(), REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 2]);
 
     BlockSpentOutputsHandle block_spent_handle{chainman->GetBlockSpentOutputsHandle(tip)};
     const uint64_t block_spent_size{block_spent_handle->GetSize()};

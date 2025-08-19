@@ -313,6 +313,19 @@ To* cast(From* from)
     return reinterpret_cast<To*>(from);
 }
 
+// CBlock <-> btck_Block
+CBlock* to_impl(btck_Block* block) { return cast<CBlock>(block); }
+const CBlock* to_impl(const btck_Block* block) { return cast<const CBlock>(block); }
+btck_Block* to_opaq(CBlock* block) { return cast<btck_Block>(block); }
+
+const std::shared_ptr<CBlock>* to_impl(const btck_BlockHandle* block) { return cast<const std::shared_ptr<CBlock>>(block); }
+btck_BlockHandle* to_opaq(std::shared_ptr<CBlock>* block) { return cast<btck_BlockHandle>(block); }
+
+template <>
+struct Borrowed<btck_BlockHandle> {
+    using type = btck_Block;
+};
+
 // CBlockUndo <-> btck_BlockSpendOutputs
 btck_BlockSpentOutputs* to_opaq(CBlockUndo* block) { return cast<btck_BlockSpentOutputs>(block); }
 CBlockUndo* to_impl(btck_BlockSpentOutputs* block) { return cast<CBlockUndo>(block); }
@@ -428,11 +441,6 @@ struct btck_ChainstateManager
 {
     std::unique_ptr<ChainstateManager> m_chainman;
     std::shared_ptr<Context> m_context;
-};
-
-struct btck_Block
-{
-    std::shared_ptr<CBlock> m_block;
 };
 
 btck_Transaction* btck_transaction_create(const unsigned char* raw_transaction, size_t raw_transaction_len)
@@ -916,36 +924,51 @@ bool btck_chainstate_manager_import_blocks(btck_ChainstateManager* chainman, con
     return true;
 }
 
-btck_Block* btck_block_create(const unsigned char* raw_block, size_t raw_block_length)
+static std::unique_ptr<CBlock> create_block_helper(const unsigned char* raw_block, size_t raw_block_length)
 {
-    auto block{std::make_shared<CBlock>()};
-
+    auto block = std::make_unique<CBlock>();
     DataStream stream{std::span{raw_block, raw_block_length}};
 
     try {
         stream >> TX_WITH_WITNESS(*block);
     } catch (const std::exception&) {
-        LogDebug(BCLog::KERNEL, "Block decode failed.");
+        LogDebug(BCLog::KERNEL, "Block decode failed for %i.", raw_block_length);
         return nullptr;
     }
 
-    return new btck_Block{std::move(block)};
+    return block;
+}
+
+btck_Block* btck_block_create(const unsigned char* raw_block, size_t raw_block_length)
+{
+    auto block{create_block_helper(raw_block, raw_block_length)};
+    if (!block) return nullptr;
+    return to_opaq(new CBlock{*block.release()});
+}
+
+btck_BlockHandle* btck_block_handle_create(const unsigned char* raw_block, size_t raw_block_length)
+{
+    auto block{create_block_helper(raw_block, raw_block_length)};
+    if (!block) return nullptr;
+    return to_opaq(new std::shared_ptr<CBlock>(std::move(block)));
 }
 
 btck_Block* btck_block_copy(const btck_Block* block)
 {
-    return new btck_Block{block->m_block};
+    assert(block);
+    return to_opaq(new CBlock{*to_impl(block)});
 }
 
 uint64_t btck_block_count_transactions(const btck_Block* block)
 {
-    return block->m_block->vtx.size();
+    return to_impl(block)->vtx.size();
 }
 
-btck_Transaction* btck_block_get_transaction_at(const btck_Block* block, uint64_t index)
+btck_Transaction* btck_block_get_transaction_at(const btck_Block* block_, uint64_t index)
 {
-    assert(index < block->m_block->vtx.size());
-    return new btck_Transaction{block->m_block->vtx[index]};
+    const auto* block{to_impl(block_)};
+    assert(index < block->vtx.size());
+    return new btck_Transaction{block->vtx[index]};
 }
 
 void btck_byte_array_destroy(btck_ByteArray* byte_array)
@@ -958,10 +981,10 @@ void btck_byte_array_destroy(btck_ByteArray* byte_array)
     byte_array = nullptr;
 }
 
-btck_ByteArray* btck_block_copy_data(btck_Block* block)
+btck_ByteArray* btck_block_copy_data(const btck_Block* block)
 {
     DataStream ss{};
-    ss << TX_WITH_WITNESS(*block->m_block);
+    ss << TX_WITH_WITNESS(*to_impl(block));
 
     auto byte_array{new btck_ByteArray{
         .data = new unsigned char[ss.size()],
@@ -990,9 +1013,10 @@ btck_ByteArray* btck_block_pointer_copy_data(const btck_BlockPointer* block_)
     return byte_array;
 }
 
-btck_BlockHash* btck_block_get_hash(btck_Block* block)
+btck_BlockHash* btck_block_get_hash(const btck_Block* block)
+
 {
-    auto hash{block->m_block->GetHash()};
+    auto hash{to_impl(block)->GetHash()};
     auto block_hash = new btck_BlockHash{};
     std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
     return block_hash;
@@ -1007,10 +1031,22 @@ btck_BlockHash* btck_block_pointer_get_hash(const btck_BlockPointer* block_)
     return block_hash;
 }
 
+void btck_block_release_handle(btck_BlockHandle* block)
+{
+    if (!block) return;
+    delete to_impl(block);
+    block = nullptr;
+}
+
+const btck_Block* btck_block_peek(const btck_BlockHandle* block)
+{
+    return peek(block);
+}
+
 void btck_block_destroy(btck_Block* block)
 {
     if (!block) return;
-    delete block;
+    delete to_impl(block);
     block = nullptr;
 }
 
@@ -1071,16 +1107,30 @@ btck_BlockIndex* btck_block_index_get_previous(const btck_BlockIndex* block_inde
     return reinterpret_cast<btck_BlockIndex*>(block_index->pprev);
 }
 
-btck_Block* btck_block_read( btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
+static std::unique_ptr<CBlock> read_block_from_disk_helper(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
 {
     const CBlockIndex* block_index{cast_const_block_index(block_index_)};
 
-    auto block{std::shared_ptr<CBlock>(new CBlock{})};
+    auto block = std::make_unique<CBlock>();
     if (!chainman->m_chainman->m_blockman.ReadBlock(*block, *block_index)) {
         LogError("Failed to read block.");
         return nullptr;
     }
-    return new btck_Block{std::move(block)};;
+    return block;
+}
+
+btck_Block* btck_read_block(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
+{
+    auto block{read_block_from_disk_helper(chainman, block_index)};
+    if (!block) return nullptr;
+    return to_opaq(new CBlock{*block.release()});
+}
+
+btck_BlockHandle* btck_read_handle_block(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
+{
+    auto block{read_block_from_disk_helper(chainman, block_index)};
+    if (!block) return nullptr;
+    return to_opaq(new std::shared_ptr<CBlock>(std::move(block)));
 }
 
 static std::unique_ptr<CBlockUndo> get_block_undo_helper(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index_)
@@ -1267,8 +1317,8 @@ void btck_coin_destroy(btck_Coin* coin)
 
 bool btck_chainstate_manager_process_block(
     btck_ChainstateManager* chainman,
-    btck_Block* block,
+    const btck_BlockHandle* block,
     bool* new_block)
 {
-    return chainman->m_chainman->ProcessNewBlock(block->m_block, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/new_block);
+    return chainman->m_chainman->ProcessNewBlock(*to_impl(block), /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/new_block);
 }

@@ -17,6 +17,9 @@
 
 namespace btck {
 
+class Block;
+class BlockHandle;
+class BlockView;
 class Coin;
 class CoinView;
 class BlockSpentOutputs;
@@ -43,6 +46,18 @@ T check(T ptr)
     }
     return ptr;
 }
+
+struct BlockTraits {
+    using c_t = btck_Block;
+    using view_t = btck::BlockView;
+    using owned_t = btck::Block;
+    using handle_c_t = btck_BlockHandle;
+    using handle_t = btck::BlockHandle;
+    static constexpr auto copy_fn = &btck_block_copy;
+    static constexpr auto destroy_fn = &btck_block_destroy;
+    static constexpr auto peek_fn = &btck_block_peek;
+    static constexpr auto release_fn = &btck_block_release_handle;
+};
 
 struct CoinTraits {
     using c_t = btck_Coin;
@@ -631,58 +646,53 @@ public:
     friend class ChainMan;
 };
 
-class Block
+class BlockView : public ViewBase<BlockTraits>
 {
-private:
-    struct Deleter {
-        void operator()(btck_Block* ptr) const noexcept
-        {
-            btck_block_destroy(ptr);
-        }
-    };
-
 public:
-    std::unique_ptr<btck_Block, Deleter> m_block;
+    using ViewBase::ViewBase;
 
-    Block(const std::span<const unsigned char> raw_block)
-        : m_block{check(btck_block_create(raw_block.data(), raw_block.size()))}
+    uint64_t CountOutputs() const
     {
+        return btck_block_count_transactions(*this);
     }
 
-    Block(btck_Block* block) : m_block{check(block)} {}
-
-    // Copy constructor and assignment
-    Block(const Block& other)
-        : m_block{check(btck_block_copy(other.m_block.get()))} { }
-    Block& operator=(const Block& other)
+    Transaction GetTransaction(uint64_t index) const
     {
-        if (this != &other) {
-            m_block.reset(check(btck_block_copy(other.m_block.get())));
-        }
-        return *this;
-    }
-
-    uint64_t CountOutputs()
-    {
-        return btck_block_count_transactions(m_block.get());
-    }
-
-    Transaction GetTransaction(uint64_t index)
-    {
-        return Transaction{btck_block_get_transaction_at(m_block.get(), index)};
+        return Transaction{btck_block_get_transaction_at(*this, index)};
     }
 
     std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
     {
-        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_get_hash(m_block.get()));
+        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_get_hash(*this));
     }
 
     std::vector<unsigned char> GetBlockData() const
     {
-        auto serialized_block{btck_block_copy_data(m_block.get())};
+        auto serialized_block{btck_block_copy_data(*this)};
         std::vector<unsigned char> vec{serialized_block->data, serialized_block->data + serialized_block->size};
         btck_byte_array_destroy(serialized_block);
         return vec;
+    }
+};
+
+class Block : public OwnedBase<BlockTraits>
+{
+public:
+    using OwnedBase::OwnedBase;
+    Block(const std::span<const unsigned char> raw_block)
+        : OwnedBase{check(btck_block_create(raw_block.data(), raw_block.size()))}
+    {
+    }
+    friend class ChainMan;
+};
+
+class BlockHandle : public HandleBase<BlockTraits>
+{
+public:
+    using HandleBase::HandleBase;
+    BlockHandle(const std::span<const unsigned char> raw_block)
+        : HandleBase{check(btck_block_handle_create(raw_block.data(), raw_block.size()))}
+    {
     }
 
     friend class ChainMan;
@@ -857,9 +867,9 @@ public:
         return btck_chainstate_manager_import_blocks(m_chainman, c_paths.data(), c_paths_lens.data(), c_paths.size());
     }
 
-    bool ProcessBlock(const Block& block, bool* new_block) const
+    bool ProcessBlock(const BlockHandle& block, bool* new_block) const
     {
-        return btck_chainstate_manager_process_block(m_chainman, block.m_block.get(), new_block);
+        return btck_chainstate_manager_process_block(m_chainman, block, new_block);
     }
 
     BlockIndex GetBlockIndexFromTip() const
@@ -891,11 +901,18 @@ public:
         return index;
     }
 
-    std::optional<Block> ReadBlock(BlockIndex& block_index) const
+    std::optional<Block> ReadBlock(const BlockIndex& block_index) const
     {
-        auto block{btck_block_read(m_chainman, block_index.m_block_index.get())};
+        auto* block{btck_read_block(m_chainman, block_index.m_block_index.get())};
         if (!block) return std::nullopt;
-        return block;
+        return Block{block};
+    }
+
+    std::optional<BlockHandle> ReadBlockHandle(const BlockIndex& block_index) const
+    {
+        auto* block{btck_read_handle_block(m_chainman, block_index.m_block_index.get())};
+        if (!block) return std::nullopt;
+        return BlockHandle{block};
     }
 
     BlockSpentOutputs GetBlockSpentOutputs(const BlockIndex& block_index) const

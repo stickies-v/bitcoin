@@ -202,6 +202,12 @@ typedef struct btck_ChainstateManager btck_ChainstateManager;
 typedef struct btck_Block btck_Block;
 
 /**
+ * Opaque struct to ensure the lifetime of a btck_Block
+ * without having to do a deep copy.
+ */
+typedef struct btck_BlockHandle btck_BlockHandle;
+
+/**
  * Opaque data structure for holding a non-owned block. This is typically a
  * block available to the user through one of the validation callbacks.
  */
@@ -956,9 +962,8 @@ BITCOINKERNEL_API bool btck_chainstate_manager_import_blocks( btck_ChainstateMan
  */
 BITCOINKERNEL_API bool BITCOINKERNEL_WARN_UNUSED_RESULT btck_chainstate_manager_process_block(
     btck_ChainstateManager* chainstate_manager,
-    btck_Block* block,
-    bool* new_block
-) BITCOINKERNEL_ARG_NONNULL(1, 2, 3);
+    const btck_BlockHandle* block,
+    bool* new_block) BITCOINKERNEL_ARG_NONNULL(1, 2, 3);
 
 /**
  * Destroy the chainstate manager.
@@ -980,10 +985,13 @@ BITCOINKERNEL_API void btck_chainstate_manager_destroy(btck_ChainstateManager* c
  * @param[in] block_index        Non-null.
  * @return                       The read out block, or null on error.
  */
-BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_read(
+BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_read_block(
     btck_ChainstateManager* chainstate_manager,
-    const btck_BlockIndex* block_index
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
+
+BITCOINKERNEL_API btck_BlockHandle* BITCOINKERNEL_WARN_UNUSED_RESULT btck_read_handle_block(
+    btck_ChainstateManager* chainstate_manager,
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
  * @brief Parse a serialized raw block into a new block object.
@@ -995,6 +1003,9 @@ BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_read(
 BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_create(
     const unsigned char* raw_block, size_t raw_block_len
 ) BITCOINKERNEL_ARG_NONNULL(1);
+
+BITCOINKERNEL_API btck_BlockHandle* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_handle_create(
+    const unsigned char* raw_block, size_t raw_block_len) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Copy a block. Blocks are reference counted, so this just increments
@@ -1036,8 +1047,7 @@ BITCOINKERNEL_API btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_
  * @return    The block hash.
  */
 BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_get_hash(
-    btck_Block* block
-) BITCOINKERNEL_ARG_NONNULL(1);
+    const btck_Block* block) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Calculate and return the hash of a block.
@@ -1056,8 +1066,7 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_po
  * @return           Allocated byte array holding the block data.
  */
 BITCOINKERNEL_API btck_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_copy_data(
-    btck_Block* block
-) BITCOINKERNEL_ARG_NONNULL(1);
+    const btck_Block* block) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Copies block data into the returned byte array.
@@ -1073,6 +1082,9 @@ BITCOINKERNEL_API btck_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_po
  * Destroy the block.
  */
 BITCOINKERNEL_API void btck_block_destroy(btck_Block* block);
+
+BITCOINKERNEL_API const btck_Block* btck_block_peek(const btck_BlockHandle* block);
+BITCOINKERNEL_API void btck_block_release_handle(btck_BlockHandle* block);
 
 ///@}
 
