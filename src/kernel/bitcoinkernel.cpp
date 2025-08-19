@@ -1117,7 +1117,7 @@ static std::unique_ptr<CBlockUndo> get_block_undo_helper(btck_ChainstateManager*
     return block_undo;
 }
 
-btck_BlockSpentOutputs* btck_get_block_spent_outputs(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
+const btck_BlockSpentOutputs* btck_get_block_spent_outputs(btck_ChainstateManager* chainman, const btck_BlockIndex* block_index)
 {
     return to_opaq(get_block_undo_helper(chainman, block_index).release());
 }
