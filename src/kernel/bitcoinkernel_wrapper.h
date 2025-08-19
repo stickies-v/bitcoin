@@ -767,6 +767,7 @@ class BlockSpentOutputs : public OwnedBase<BlockSpentOutputsTraits>
 {
 public:
     using OwnedBase::OwnedBase;
+    friend class ChainMan;
 };
 
 class BlockSpentOutputsHandle : public HandleBase<BlockSpentOutputsTraits>
@@ -895,6 +896,11 @@ public:
         auto block{btck_block_read(m_chainman, block_index.m_block_index.get())};
         if (!block) return std::nullopt;
         return block;
+    }
+
+    BlockSpentOutputs GetBlockSpentOutputs(const BlockIndex& block_index) const
+    {
+        return BlockSpentOutputs{btck_get_block_spent_outputs(m_chainman, block_index.m_block_index.get())};
     }
 
     BlockSpentOutputsHandle GetBlockSpentOutputsHandle(const BlockIndex& block_index) const

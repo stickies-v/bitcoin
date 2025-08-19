@@ -602,6 +602,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     BlockSpentOutputsHandle block_spent_handle{chainman->GetBlockSpentOutputsHandle(tip)};
     const uint64_t block_spent_size{block_spent_handle->GetSize()};
     BOOST_CHECK_EQUAL(block_spent_size, 1);
+    BOOST_CHECK_EQUAL(block_spent_size, chainman->GetBlockSpentOutputs(tip)->GetSize()); // ensure handle and view lead to the same result
     TransactionSpentOutputsView transaction_spent_view{block_spent_handle->GetTxSpentOutputs(block_spent_size - 1)};
     CoinView coin{transaction_spent_view.GetCoin(transaction_spent_view.GetSize() - 1)};
     TransactionOutputView output = coin.GetOutput();

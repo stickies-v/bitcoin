@@ -1223,6 +1223,11 @@ BITCOINKERNEL_API btck_BlockSpentOutputsHandle* BITCOINKERNEL_WARN_UNUSED_RESULT
     btck_ChainstateManager* chainstate_manager,
     const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
+// Returns non-owning view.
+BITCOINKERNEL_API btck_BlockSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_get_block_spent_outputs(
+    btck_ChainstateManager* chainstate_manager,
+    const btck_BlockIndex* block_index) BITCOINKERNEL_ARG_NONNULL(1, 2);
+
 BITCOINKERNEL_API const btck_BlockSpentOutputs* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_spent_outputs_peek(
     const btck_BlockSpentOutputsHandle*) BITCOINKERNEL_ARG_NONNULL(1);
 
