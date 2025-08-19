@@ -603,9 +603,9 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     const uint64_t block_spent_size{block_spent_handle->GetSize()};
     BOOST_CHECK_EQUAL(block_spent_size, 1);
     TransactionSpentOutputsView transaction_spent_view{block_spent_handle->GetTxSpentOutputs(block_spent_size - 1)};
-    RefWrapper<Coin> coin{transaction_spent_view.GetCoin(transaction_spent_view.GetSize() - 1)};
-    TransactionOutputView output = coin.Get().GetOutput();
-    uint32_t coin_height = coin.Get().GetConfirmationHeight();
+    CoinView coin{transaction_spent_view.GetCoin(transaction_spent_view.GetSize() - 1)};
+    TransactionOutputView output = coin.GetOutput();
+    uint32_t coin_height = coin.GetConfirmationHeight();
     BOOST_CHECK_EQUAL(coin_height, 205);
     BOOST_CHECK_EQUAL(output.GetAmount(), 100000000);
     auto script_pubkey = output.GetScriptPubkey();
@@ -613,14 +613,15 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
 
     // Check that handle and view lead to same result
     TransactionSpentOutputsHandle transaction_spent_handle{block_spent_handle.GetTxSpentOutputsHandle(block_spent_size - 1)};
-    BOOST_CHECK_EQUAL(transaction_spent_handle->GetCoin(transaction_spent_handle->GetSize() - 1).Get().GetOutput().GetAmount(), 100000000);
+    BOOST_CHECK_EQUAL(transaction_spent_handle->GetCoin(transaction_spent_handle->GetSize() - 1).GetOutput().GetAmount(), 100000000);
 
     ScriptPubkey detached_spk{output.deep_copy()};
     BOOST_CHECK_EQUAL(detached_spk->GetScriptPubkeyData().size(), 22);
 
-    Coin coin_copy{coin.Get()};
+    Coin coin_copy{coin.deep_copy()};
     TransactionOutput detached_output{std::move(coin_copy)};
     BOOST_CHECK_EQUAL(detached_output->GetAmount(), 100000000);
+    BOOST_CHECK(!coin_copy); // detached-from is no longer valid
 
 
     // Test that reading past the size returns null data

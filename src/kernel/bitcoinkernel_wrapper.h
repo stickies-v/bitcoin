@@ -18,6 +18,7 @@
 namespace btck {
 
 class Coin;
+class CoinView;
 class BlockSpentOutputs;
 class BlockSpentOutputsHandle;
 class BlockSpentOutputsView;
@@ -42,6 +43,14 @@ T check(T ptr)
     }
     return ptr;
 }
+
+struct CoinTraits {
+    using c_t = btck_Coin;
+    using view_t = btck::CoinView;
+    using owned_t = btck::Coin;
+    static constexpr auto copy_fn = &btck_coin_copy;
+    static constexpr auto destroy_fn = &btck_coin_destroy;
+};
 
 struct ScriptPubkeyTraits {
     using c_t = btck_ScriptPubkey;
@@ -199,24 +208,6 @@ protected:
 
 namespace btck {
 
-template <typename T>
-class RefWrapper
-{
-private:
-    T m_ref_data;
-public:
-    RefWrapper(T&& data) : m_ref_data{std::move(data)} {}
-
-    // Copying this data type might be dangerous, so prohibit it.
-    RefWrapper(const RefWrapper&) = delete;
-    RefWrapper& operator=(const RefWrapper& other) = delete;
-
-    T& Get()
-    {
-        return m_ref_data;
-    }
-};
-
 class ScriptPubkeyView : public ViewBase<ScriptPubkeyTraits>
 {
 public:
@@ -274,6 +265,10 @@ public:
     TransactionOutput(const ScriptPubkeyView& script_pubkey, int64_t amount)
         : OwnedBase{check(btck_transaction_output_create(script_pubkey, amount))} {}
     TransactionOutput(Coin&& coin);
+
+private:
+    friend class Coin;
+    friend class ScriptPubkey;
 
     ScriptPubkey DetachScriptPubkey()
     {
@@ -693,55 +688,42 @@ public:
     friend class ChainMan;
 };
 
-class Coin
+class CoinView : public ViewBase<CoinTraits>
 {
-private:
-    struct Deleter {
-        void operator()(btck_Coin* ptr) const noexcept
-        {
-            btck_coin_destroy(ptr);
-        }
-    };
-
 public:
-    std::unique_ptr<btck_Coin, Deleter> m_coin;
+    using ViewBase::ViewBase;
 
-    Coin(btck_Coin* coin) : m_coin{check(coin)} {}
-
-    // Copy constructor and assignment
-    Coin(const Coin& other)
-        : m_coin{check(btck_coin_copy(other.m_coin.get()))} { }
-    Coin& operator=(const Coin& other)
-    {
-        if (this != &other) {
-            m_coin.reset(check(btck_coin_copy(other.m_coin.get())));
-        }
-        return *this;
-    }
-
-    uint32_t GetConfirmationHeight() const { return btck_coin_confirmation_height(m_coin.get()); }
-
-    bool IsCoinbase() const { return btck_coin_is_coinbase(m_coin.get()); }
-
-    TransactionOutputView GetOutput() const
-    {
-        return btck_coin_get_output(m_coin.get());
-    }
+    uint32_t GetConfirmationHeight() const { return btck_coin_confirmation_height(*this); }
+    bool IsCoinbase() const { return btck_coin_is_coinbase(*this); }
+    TransactionOutputView GetOutput() const { return btck_coin_get_output(*this); }
 };
 
-TransactionOutput::TransactionOutput(Coin&& coin)
-    : OwnedBase(check(btck_coin_detach_output(coin.m_coin.release())))
+class Coin : public OwnedBase<CoinTraits>
 {
-}
+public:
+    using OwnedBase::OwnedBase;
+    friend class TransactionOutput;
+
+private:
+    TransactionOutput DetachOutput()
+    {
+        if (!m_ptr) throw std::runtime_error("output cannot be detached");
+        return TransactionOutput{check(btck_coin_detach_output(this->release()))};
+    }
+
+    // explicit Coin(c_t* ptr = nullptr) : OwnedBase(ptr) {}
+};
+
+TransactionOutput::TransactionOutput(Coin&& coin) : OwnedBase(coin.DetachOutput()) {}
 
 class TransactionSpentOutputsView : public ViewBase<TransactionSpentOutputsTraits>
 {
 public:
     using ViewBase::ViewBase;
 
-    RefWrapper<Coin> GetCoin(uint64_t index) const
+    CoinView GetCoin(uint64_t index) const
     {
-        return Coin{btck_transaction_spent_outputs_get_coin_at(*this, index)};
+        return {btck_transaction_spent_outputs_get_coin_at(*this, index)};
     }
 
     uint64_t GetSize() const

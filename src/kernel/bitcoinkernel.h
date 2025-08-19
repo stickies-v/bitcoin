@@ -1310,7 +1310,7 @@ BITCOINKERNEL_API uint64_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_spe
  *                                      transaction spent outputs.
  * @return                              A coin pointer.
  */
-BITCOINKERNEL_API btck_Coin* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_spent_outputs_get_coin_at(
+BITCOINKERNEL_API const btck_Coin* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_spent_outputs_get_coin_at(
     const btck_TransactionSpentOutputs* transaction_spent_outputs,
     uint64_t coin_index) BITCOINKERNEL_ARG_NONNULL(1);
 

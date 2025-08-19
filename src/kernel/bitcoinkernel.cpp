@@ -327,6 +327,13 @@ struct Borrowed<btck_BlockSpentOutputsHandle> {
     using type = btck_BlockSpentOutputs;
 };
 
+// Coin <-> btck_Coin
+Coin* to_impl(btck_Coin* ptr) { return cast<Coin>(ptr); }
+const Coin* to_impl(const btck_Coin* ptr) { return cast<const Coin>(ptr); }
+
+btck_Coin* to_opaq(Coin* ptr) { return cast<btck_Coin>(ptr); }
+const btck_Coin* to_opaq(const Coin* ptr) { return cast<const btck_Coin>(ptr); }
+
 // CScript <-> btck_Script
 CScript* to_impl(btck_ScriptPubkey* spk) { return cast<CScript>(spk); }
 const CScript* to_impl(const btck_ScriptPubkey* spk) { return cast<const CScript>(spk); }
@@ -337,6 +344,7 @@ const btck_ScriptPubkey* to_opaq(const CScript* script) { return cast<const btck
 CTxOut* to_impl(btck_TransactionOutput* output) { return cast<CTxOut>(output); }
 const CTxOut* to_impl(const btck_TransactionOutput* output) { return cast<const CTxOut>(output); }
 btck_TransactionOutput* to_opaq(CTxOut* output) { return cast<btck_TransactionOutput>(output); }
+const btck_TransactionOutput* to_opaq(const CTxOut* output) { return cast<const btck_TransactionOutput>(output); }
 
 // CTxUndo <-> btck_TransactionSpentOutputs
 CTxUndo* to_impl(btck_TransactionSpentOutputs* tx_undo) { return cast<CTxUndo>(tx_undo); }
@@ -425,12 +433,6 @@ struct btck_ChainstateManager
 struct btck_Block
 {
     std::shared_ptr<CBlock> m_block;
-};
-
-struct btck_Coin
-{
-    const Coin* m_coin;
-    bool m_owned;
 };
 
 btck_Transaction* btck_transaction_create(const unsigned char* raw_transaction, size_t raw_transaction_len)
@@ -1199,17 +1201,16 @@ void btck_transaction_spent_outputs_release_handle(
     release_handle(handle);
 }
 
-btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, uint64_t coin_index)
+const btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, uint64_t coin_index)
 {
     const auto* outputs{to_impl(transaction_spent_outputs)};
     assert(coin_index < outputs->vprevout.size());
-    const Coin& coin{outputs->vprevout.at(coin_index)};
-    return new btck_Coin{&coin, false};
+    return to_opaq(&outputs->vprevout.at(coin_index));
 }
 
 btck_Coin* btck_coin_copy(const btck_Coin* coin)
 {
-    return new btck_Coin{new Coin{*coin->m_coin}, true};
+    return to_opaq(new Coin{*to_impl(coin)});
 }
 
 int32_t btck_block_index_get_height(const btck_BlockIndex* block_index_)
@@ -1237,23 +1238,22 @@ void btck_block_hash_destroy(btck_BlockHash* hash)
 
 uint32_t btck_coin_confirmation_height(const btck_Coin* coin)
 {
-    return coin->m_coin->nHeight;
+    return to_impl(coin)->nHeight;
 }
 
 bool btck_coin_is_coinbase(const btck_Coin* coin)
 {
-    return coin->m_coin->IsCoinBase();
+    return to_impl(coin)->IsCoinBase();
 }
 
 const btck_TransactionOutput* btck_coin_get_output(const btck_Coin* coin)
 {
-    const CTxOut* output{&coin->m_coin->out};
-    return reinterpret_cast<const btck_TransactionOutput*>(output);
+    return to_opaq(&to_impl(coin)->out);
 }
 
 btck_TransactionOutput* btck_coin_detach_output(btck_Coin* coin)
 {
-    auto* output{new CTxOut{std::move(coin->m_coin->out)}};
+    auto* output{new CTxOut{std::move(to_impl(coin)->out)}};
     btck_coin_destroy(coin);
     return to_opaq(output);
 }
@@ -1261,10 +1261,7 @@ btck_TransactionOutput* btck_coin_detach_output(btck_Coin* coin)
 void btck_coin_destroy(btck_Coin* coin)
 {
     if (!coin) return;
-    if (coin->m_owned) {
-        delete coin->m_coin;
-    }
-    delete coin;
+    delete to_impl(coin);
     coin = nullptr;
 }
 
