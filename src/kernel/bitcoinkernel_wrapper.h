@@ -111,6 +111,7 @@ class ViewBase
 {
 public:
     using c_t = Traits::c_t;
+    using owned_t = Traits::owned_t;
 
     ViewBase(const c_t* ptr = nullptr) : m_ptr(ptr) {}
     operator const c_t*() const { return m_ptr; }
@@ -118,7 +119,7 @@ public:
     [[nodiscard]] typename Traits::owned_t deep_copy() const
         requires requires { Traits::copy_fn; }
     {
-        return typename Traits::owned_t(Traits::copy_fn(m_ptr));
+        return owned_t{*this};
     }
 
 protected:
@@ -139,6 +140,12 @@ public:
 
     OwnedBase(OwnedBase&&) noexcept = default;
     OwnedBase& operator=(OwnedBase&&) noexcept = default;
+
+    explicit OwnedBase(const ViewBase<Traits>& view)
+        requires requires { Traits::copy_fn; }
+        : OwnedBase(check(Traits::copy_fn(view)))
+    {
+    }
 
     // ensure view constructors can only be called on l-values to avoid dangling references
     view_t view() const& { return m_ptr.get(); }
@@ -243,7 +250,6 @@ public:
 
 private:
     friend class TransactionOutput;
-    explicit ScriptPubkey(btck_ScriptPubkey* spk) : OwnedBase(spk) {}
 };
 
 class TransactionOutputView : public ViewBase<TransactionOutputTraits>
@@ -275,9 +281,6 @@ public:
         return ScriptPubkey{check(btck_transaction_output_detach_script_pubkey(this->release()))};
     }
 
-private:
-    friend class ViewBase<TransactionOutputTraits>;
-    explicit TransactionOutput(btck_TransactionOutput* ptr) : OwnedBase(ptr) {}
 };
 
 ScriptPubkey::ScriptPubkey(TransactionOutput&& output) : OwnedBase(output.DetachScriptPubkey()) {}
@@ -760,7 +763,6 @@ public:
 
 private:
     friend class BlockSpentOutputsHandle;
-    explicit TransactionSpentOutputsHandle(handle_c_t* ptr = nullptr) : HandleBase(ptr) {}
 };
 
 class BlockSpentOutputsView : public ViewBase<BlockSpentOutputsTraits>
@@ -798,7 +800,6 @@ public:
 
 private:
     friend class ChainMan;
-    explicit BlockSpentOutputsHandle(handle_c_t* ptr = nullptr) : HandleBase(ptr) {}
 };
 
 class BlockIndex
