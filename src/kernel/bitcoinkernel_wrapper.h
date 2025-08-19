@@ -130,6 +130,14 @@ private:
     View m_view;
 };
 
+/**
+ * @brief Base for types that are borrowed, non-owning views of a C resource.
+ *
+ * A View wraps a `const btck_*` pointer. Its lifetime is tied to the `Owned` or
+ * `Handle` object from which it was obtained. It is cheap to copy and provides a
+ * read-only API to the underlying resource. The user is never responsible for
+ * destroying a View's underlying resource.
+ */
 template <typename Traits>
 class ViewBase
 {
@@ -150,6 +158,16 @@ protected:
     const c_t* m_ptr;
 };
 
+/**
+ * @brief Base for types that have unique ownership of a C resource.
+ *
+ * An Owned object wraps a `btck_*` pointer and manages its lifetime via RAII,
+ * calling the corresponding `_destroy` function upon destruction.
+ *
+ * Owned types are move-only to enforce unique ownership at compile time. They
+ * can be converted to a corresponding `View` for read-only access, and new
+ * Owned objects can be created by explicitly copying a `View`.
+ */
 template <typename Traits>
 class OwnedBase
 {
@@ -187,6 +205,18 @@ protected:
     std::unique_ptr<c_t, OwnedDeleter<Traits>> m_ptr;
 };
 
+/**
+ * @brief Base for types that manage a handle to a shared C resource.
+ *
+ * A Handle object wraps a `btck_*Handle` pointer. The handle itself has unique
+ * ownership semantics (it is move-only), but it points to an underlying C
+ * resource that is internally reference-counted.
+ *
+ * The Handle's lifetime is managed via RAII, calling the corresponding
+ * `_release_handle` function upon destruction to decrement the C API's
+ * reference count. A `View` can be obtained from a Handle via the `_peek`
+ * mechanism for read-only access.
+ */
 template <typename Traits>
 class HandleBase
 {

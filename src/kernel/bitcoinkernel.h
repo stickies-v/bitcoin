@@ -88,20 +88,35 @@ extern "C" {
  *
  * @section pointer Pointer and argument conventions
  *
- * The user is responsible for de-allocating the memory owned by pointers
- * returned by functions. Typically pointers returned by *_create(...) functions
- * can be de-allocated by corresponding *_destroy(...) functions.
+ * The C API uses a strict set of conventions to signal resource ownership and
+ * expected lifetimes. Understanding these is critical to prevent memory leaks or
+ * use-after-free errors. There are three categories of pointers:
  *
- * A function that takes pointer arguments makes no assumptions on their
- * lifetime. Once the function returns the user can safely de-allocate the
- * passed in arguments.
+ * 1.  **Owned Pointers (`btck_*`)**: A non-`const` pointer to a `btck_` struct
+ *     (e.g., `btck_TransactionOutput*`) signifies unique ownership.
+ *     - **Creation**: Typically returned by `_create` or `_copy` functions.
+ *     - **Responsibility**: The caller **must** destroy this resource using the
+ *       corresponding `_destroy` function (e.g., `btck_transaction_output_destroy`).
  *
- * Pointers passed by callbacks are not owned by the user and are only valid
- * for the duration of the callback. They are always marked as `const` and must
- * not be de-allocated by the user.
+ * 2.  **Handle Pointers (`btck_*Handle`)**: A pointer to a struct ending in
+ *     `Handle` (e.g., `btck_BlockSpentOutputsHandle*`) signifies a managed
+ *     reference to a potentially shared and expensive-to-copy resource.
+ *     - **Creation**: Returned by `_get_handle_` functions.
+ *     - **Responsibility**: The caller receives a unique handle object which must
+ *       be destroyed via a `_release_handle` function. This function decrements
+ *       the underlying resource's internal reference count.
  *
- * Array lengths follow the pointer argument they describe.
+ * 3.  **Borrowed Pointers (`const btck_*`)**: A `const` pointer to a `btck_`
+ *     struct (e.g., `const btck_ScriptPubkey*`) signifies a borrowed, non-owning
+ *     view.
+ *     - **Creation**: Returned by `_get_` or `_peek_` functions, and passed as a
+ *       parameter in callbacks.
+ *     - **Responsibility**: The caller **must not** destroy this pointer. Its
+ *       lifetime is tied to the object it was obtained from and is only guaranteed
+ *       to be valid for the immediate scope unless documented otherwise.
+ *
  */
+
 
 /**
  * Opaque data structure for holding a transaction.
