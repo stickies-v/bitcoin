@@ -454,33 +454,6 @@ struct BlockHashDeleter {
     }
 };
 
-class UnownedBlock
-{
-private:
-    const btck_BlockPointer* m_block;
-
-public:
-    UnownedBlock(const btck_BlockPointer* block) : m_block{block} {}
-
-    UnownedBlock(const UnownedBlock&) = delete;
-    UnownedBlock& operator=(const UnownedBlock&) = delete;
-    UnownedBlock(UnownedBlock&&) = delete;
-    UnownedBlock& operator=(UnownedBlock&&) = delete;
-
-    std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
-    {
-        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_pointer_get_hash(m_block));
-    }
-
-    std::vector<unsigned char> GetBlockData() const
-    {
-        auto serialized_block{btck_block_pointer_copy_data(m_block)};
-        std::vector<unsigned char> vec{serialized_block->data, serialized_block->data + serialized_block->size};
-        btck_byte_array_destroy(serialized_block);
-        return vec;
-    }
-};
-
 class BlockValidationState
 {
 private:
@@ -514,8 +487,8 @@ private:
 public:
     ValidationInterface() : m_validation_interface{btck_ValidationInterfaceCallbacks{
                                 .user_data = this,
-                                .block_checked = [](void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state) {
-                                    static_cast<T*>(user_data)->BlockChecked(UnownedBlock{block}, BlockValidationState{state});
+                                .block_checked = [](void* user_data, const btck_Block* block, const btck_BlockValidationState* state) {
+                                    static_cast<T*>(user_data)->BlockChecked(block, BlockValidationState{state});
                                 },
                             }}
     {
@@ -523,7 +496,7 @@ public:
 
     virtual ~ValidationInterface() = default;
 
-    virtual void BlockChecked(UnownedBlock block, const BlockValidationState state) {}
+    virtual void BlockChecked(const BlockView& block, const BlockValidationState state) {}
 
     friend class ContextOptions;
 };

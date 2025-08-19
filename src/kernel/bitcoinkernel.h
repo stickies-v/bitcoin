@@ -208,12 +208,6 @@ typedef struct btck_Block btck_Block;
 typedef struct btck_BlockHandle btck_BlockHandle;
 
 /**
- * Opaque data structure for holding a non-owned block. This is typically a
- * block available to the user through one of the validation callbacks.
- */
-typedef struct btck_BlockPointer btck_BlockPointer;
-
-/**
  * Opaque data structure for holding the state of a block during validation.
  *
  * Contains information indicating whether validation was successful, and if not
@@ -298,7 +292,7 @@ typedef void (*btck_NotifyFatalError)(void* user_data, const char* message, size
 /**
  * Function signatures for the validation interface.
  */
-typedef void (*btck_ValidationInterfaceBlockChecked)(void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state);
+typedef void (*btck_ValidationInterfaceBlockChecked)(void* user_data, const btck_Block* block, const btck_BlockValidationState* state);
 
 /**
  * Whether a validated data structure is valid, invalid, or an error was
@@ -1050,16 +1044,6 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_ge
     const btck_Block* block) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Calculate and return the hash of a block.
- *
- * @param[in] block Non-null.
- * @return    The block hash.
- */
-BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_pointer_get_hash(
-    const btck_BlockPointer* block
-) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
  * @brief Copies block data into the returned byte array.
  *
  * @param[in] block  Non-null.
@@ -1067,16 +1051,6 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_po
  */
 BITCOINKERNEL_API btck_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_copy_data(
     const btck_Block* block) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
- * @brief Copies block data into the returned byte array.
- *
- * @param[in] block  Non-null.
- * @return           Allocated byte array holding the block data.
- */
-BITCOINKERNEL_API btck_ByteArray* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_pointer_copy_data(
-    const btck_BlockPointer* block
-) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * Destroy the block.

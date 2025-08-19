@@ -207,7 +207,7 @@ protected:
     {
         if (m_cbs.block_checked) {
             m_cbs.block_checked((void*)m_cbs.user_data,
-                                reinterpret_cast<const btck_BlockPointer*>(&block),
+                                reinterpret_cast<const btck_Block*>(&block), // TODO: replace with to_opaq, but requires reshuffling a lot of code
                                 reinterpret_cast<const btck_BlockValidationState*>(&stateIn));
         }
     }
@@ -391,12 +391,6 @@ const BlockValidationState* cast_block_validation_state(const btck_BlockValidati
 {
     assert(block_validation_state);
     return reinterpret_cast<const BlockValidationState*>(block_validation_state);
-}
-
-const CBlock* cast_const_cblock(const btck_BlockPointer* block)
-{
-    assert(block);
-    return reinterpret_cast<const CBlock*>(block);
 }
 
 const CBlockIndex* cast_const_block_index(const btck_BlockIndex* index)
@@ -996,36 +990,10 @@ btck_ByteArray* btck_block_copy_data(const btck_Block* block)
     return byte_array;
 }
 
-btck_ByteArray* btck_block_pointer_copy_data(const btck_BlockPointer* block_)
-{
-    auto block{cast_const_cblock(block_)};
-
-    DataStream ss{};
-    ss << TX_WITH_WITNESS(*block);
-
-    auto byte_array{new btck_ByteArray{
-        .data = new unsigned char[ss.size()],
-        .size = ss.size(),
-    }};
-
-    std::memcpy(byte_array->data, ss.data(), byte_array->size);
-
-    return byte_array;
-}
-
 btck_BlockHash* btck_block_get_hash(const btck_Block* block)
 
 {
     auto hash{to_impl(block)->GetHash()};
-    auto block_hash = new btck_BlockHash{};
-    std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
-    return block_hash;
-}
-
-btck_BlockHash* btck_block_pointer_get_hash(const btck_BlockPointer* block_)
-{
-    auto block{cast_const_cblock(block_)};
-    auto hash{block->GetHash()};
     auto block_hash = new btck_BlockHash{};
     std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
     return block_hash;
