@@ -185,8 +185,6 @@ string(APPEND CMAKE_CXX_COMPILE_OBJECT " ${APPEND_CPPFLAGS} ${APPEND_CXXFLAGS}")
 string(APPEND CMAKE_CXX_CREATE_SHARED_LIBRARY " ${APPEND_LDFLAGS}")
 string(APPEND CMAKE_CXX_LINK_EXECUTABLE " ${APPEND_LDFLAGS}")
 
-set(configure_warnings)
-
 include(CheckLinkerSupportsPIE)
 check_linker_supports_pie()
 
@@ -696,13 +694,6 @@ include(FlagsSummary)
 flags_summary()
 message("Treat compiler warnings as errors ..... ${WERROR}")
 message("\n")
-if(configure_warnings)
-    message("  ******\n")
-    foreach(warning IN LISTS configure_warnings)
-      message(WARNING "${warning}")
-    endforeach()
-    message("  ******\n")
-endif()
 
 # We want all build properties to be encapsulated properly.
 include(WarnAboutGlobalProperties)
