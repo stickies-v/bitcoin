@@ -120,7 +120,6 @@ cmake_dependent_option(BUILD_WALLET_TOOL "Build bitcoin-wallet tool." ${BUILD_TE
 
 option(REDUCE_EXPORTS "Attempt to reduce exported symbols in the resulting executables." OFF)
 option(WERROR "Treat compiler warnings as errors." OFF)
-option(WITH_CCACHE "Attempt to use ccache for compiling." ON)
 
 option(WITH_ZMQ "Enable ZMQ notifications." OFF)
 if(WITH_ZMQ)
@@ -419,8 +418,6 @@ endif()
 
 include(cmake/introspection.cmake)
 
-include(cmake/ccache.cmake)
-
 add_library(warn_interface INTERFACE)
 target_link_libraries(core_interface INTERFACE warn_interface)
 if(MSVC)
@@ -698,7 +695,6 @@ message("C++ compiler .......................... ${CMAKE_CXX_COMPILER_ID} ${CMAK
 include(FlagsSummary)
 flags_summary()
 message("Treat compiler warnings as errors ..... ${WERROR}")
-message("Use ccache for compiling .............. ${WITH_CCACHE}")
 message("\n")
 if(configure_warnings)
     message("  ******\n")
