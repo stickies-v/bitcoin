@@ -30,7 +30,7 @@ function(create_test_config)
   configure_file(config.ini.in config.ini USE_SOURCE_PERMISSIONS @ONLY)
 endfunction()
 
-if(NOT TARGET Python3::Interpreter)
+if(NOT Python3_Interpreter_FOUND)
   message(FATAL_ERROR "Minimum required Python not found. Consider configuring with -DBUILD_FUNCTIONAL_TESTS=0.")
 endif()
 
