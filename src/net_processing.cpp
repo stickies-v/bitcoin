@@ -23,6 +23,7 @@
 #include <headerssync.h>
 #include <index/blockfilterindex.h>
 #include <kernel/chain.h>
+#include <kernel/warning.h>
 #include <logging.h>
 #include <merkleblock.h>
 #include <net.h>
@@ -4617,7 +4618,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                 if (it != m_headers_presync_stats.end()) stats = it->second;
             }
             if (stats.second) {
-                m_chainman.ReportHeadersPresync(stats.first, stats.second->first, stats.second->second);
+                m_chainman.ReportHeadersPresync(
+                    /*work=*/stats.first,
+                    /*height=*/stats.second->first,
+                    /*timestamp=*/stats.second->second,
+                    m_warnings.IsSet(kernel::Warning::LARGE_WORK_INVALID_CHAIN));
             }
         }
 

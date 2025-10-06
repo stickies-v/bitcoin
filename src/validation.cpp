@@ -4368,7 +4368,7 @@ bool ChainstateManager::ProcessNewBlockHeaders(std::span<const CBlockHeader> hea
     return true;
 }
 
-void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t height, int64_t timestamp)
+void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t height, int64_t timestamp, bool large_work_invalid_chain)
 {
     AssertLockNotHeld(GetMutex());
     {
@@ -4382,6 +4382,15 @@ void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t 
         auto now = MockableSteadyClock::now();
         if (now < m_last_presync_update + std::chrono::milliseconds{250}) return;
         m_last_presync_update = now;
+    }
+    if (large_work_invalid_chain) {
+        static std::atomic<int64_t> previous_height{height};
+        if (height <= previous_height.exchange(height)) {
+            LogWarning(
+                "An invalid chain with a large amount of work was found earlier. If "
+                "headers pre-sync keeps failing, disk corruption is indicated. Investigate "
+                "hardware issues and try restarting with -reindex.");
+        }
     }
     bool initial_download = IsInitialBlockDownload();
     GetNotifications().headerTip(GetSynchronizationState(initial_download, m_blockman.m_blockfiles_indexed), height, timestamp, /*presync=*/true);
