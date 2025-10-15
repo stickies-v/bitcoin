@@ -27,15 +27,19 @@ BOOST_AUTO_TEST_CASE(warnings)
     BOOST_CHECK(warnings.GetMessages().size() == 0);
     // Add two warnings
     BOOST_CHECK(warnings.Set(warning_1, _("warning 1")));
+    BOOST_CHECK(warnings.IsSet(warning_1));
     BOOST_CHECK(warnings.Set(warning_2, _("warning 2")));
+    BOOST_CHECK(warnings.IsSet(warning_2));
     // Unset the second one
     BOOST_CHECK(warnings.Unset(warning_2));
     // Since it's already been unset, this should return false
+    BOOST_CHECK(!warnings.IsSet(warning_2));
     BOOST_CHECK(!warnings.Unset(warning_2));
     // We should now be able to set w2 again
     BOOST_CHECK(warnings.Set(warning_2, _("warning 2 - revision 1")));
     // Setting w2 again should return false since it's already set
     BOOST_CHECK(!warnings.Set(warning_2, _("warning 2 - revision 2")));
+    BOOST_CHECK(warnings.IsSet(warning_2));
 
     // Verify messages are correct
     const auto messages{warnings.GetMessages()};

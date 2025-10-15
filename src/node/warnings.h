@@ -49,6 +49,14 @@ public:
     Warnings(const Warnings&) = delete;
     Warnings& operator=(const Warnings&) = delete;
     /**
+     * @brief Check if a warning with the specified `id` is currently active.
+     *
+     * @param[in]   id  Unique identifier of the warning.
+     *
+     * @returns true if the warning is currently set, otherwise false.
+     */
+    bool IsSet(warning_type id) const EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+    /**
      * @brief Set a warning message. If a warning with the specified
      *        `id` is already active, false is returned and the new
      *        warning is ignored. If `id` does not yet exist, the

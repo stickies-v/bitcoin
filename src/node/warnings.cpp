@@ -26,6 +26,11 @@ Warnings::Warnings()
              _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications")});
     }
 }
+bool Warnings::IsSet(warning_type id) const
+{
+    return WITH_LOCK(m_mutex, return m_warnings.contains(id));
+}
+
 bool Warnings::Set(warning_type id, bilingual_str message)
 {
     const auto& [_, inserted]{WITH_LOCK(m_mutex, return m_warnings.insert({id, std::move(message)}))};
