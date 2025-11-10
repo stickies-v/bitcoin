@@ -914,13 +914,13 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     TransactionSpentOutputs owned_transaction_spent_outputs{transaction_spent_outputs};
     TransactionSpentOutputs owned_transaction_spent_outputs_prev{block_spent_outputs_prev.GetTxSpentOutputs(block_spent_outputs_prev.Count() - 1)};
     CheckHandle(owned_transaction_spent_outputs, owned_transaction_spent_outputs_prev);
-    CheckRange(transaction_spent_outputs.Coins(), transaction_spent_outputs.Count());
+    CheckRange(transaction_spent_outputs.Coins(), transaction_spent_outputs.Coins().size());
 
     // Get the last coin from the transaction spent outputs
-    CoinView coin{transaction_spent_outputs.GetCoin(transaction_spent_outputs.Count() - 1)};
+    CoinView coin{transaction_spent_outputs.Coins().back()};
     BOOST_CHECK(!coin.IsCoinbase());
     Coin owned_coin{coin};
-    Coin owned_coin_prev{owned_transaction_spent_outputs_prev.GetCoin(owned_transaction_spent_outputs_prev.Count() - 1)};
+    Coin owned_coin_prev{owned_transaction_spent_outputs_prev.Coins().back()};
     CheckHandle(owned_coin, owned_coin_prev);
 
     // Validate coin properties

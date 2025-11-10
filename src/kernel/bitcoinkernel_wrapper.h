@@ -1057,7 +1057,7 @@ private:
     friend Derived;
     TransactionSpentOutputsApi() = default;
 
-public:
+private:
     size_t Count() const
     {
         return btck_transaction_spent_outputs_count(impl());
@@ -1068,6 +1068,7 @@ public:
         return CoinView{btck_transaction_spent_outputs_get_coin_at(impl(), index)};
     }
 
+public:
     MAKE_RANGE_METHOD(Coins, Derived, &TransactionSpentOutputsApi<Derived>::Count, &TransactionSpentOutputsApi<Derived>::GetCoin, *static_cast<const Derived*>(this))
 };
 
