@@ -762,8 +762,11 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     // Check that we can read the previous block
     BlockTreeEntry tip_2{*tip.GetPrevious()};
     Block read_block_2{*chainman->ReadBlock(tip_2)};
-    BOOST_CHECK_EQUAL(chainman->ReadBlockSpentOutputs(tip_2).Count(), 0);
-    BOOST_CHECK_EQUAL(chainman->ReadBlockSpentOutputs(tip).Count(), 0);
+
+    auto tip_2_block_spent_outputs{chainman->ReadBlockSpentOutputs(tip_2)};
+    auto tip_block_spent_outputs{chainman->ReadBlockSpentOutputs(tip)};
+    BOOST_CHECK_EQUAL(tip_2_block_spent_outputs.TxsSpentOutputs().size(), 0);
+    BOOST_CHECK_EQUAL(tip_block_spent_outputs.TxsSpentOutputs().size(), 0);
 
     // It should be an error if we go another block back, since the genesis has no ancestor
     BOOST_CHECK(!tip_2.GetPrevious());
@@ -906,13 +909,12 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     BlockSpentOutputs block_spent_outputs{chainman->ReadBlockSpentOutputs(tip)};
     BlockSpentOutputs block_spent_outputs_prev{chainman->ReadBlockSpentOutputs(*tip.GetPrevious())};
     CheckHandle(block_spent_outputs, block_spent_outputs_prev);
-    CheckRange(block_spent_outputs_prev.TxsSpentOutputs(), block_spent_outputs_prev.Count());
-    BOOST_CHECK_EQUAL(block_spent_outputs.Count(), 1);
+    BOOST_CHECK_EQUAL(block_spent_outputs.TxsSpentOutputs().size(), 1);
 
     // Get transaction spent outputs from the last transaction in the two blocks
-    TransactionSpentOutputsView transaction_spent_outputs{block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.Count() - 1)};
+    TransactionSpentOutputsView transaction_spent_outputs{block_spent_outputs.TxsSpentOutputs().back()};
     TransactionSpentOutputs owned_transaction_spent_outputs{transaction_spent_outputs};
-    TransactionSpentOutputs owned_transaction_spent_outputs_prev{block_spent_outputs_prev.GetTxSpentOutputs(block_spent_outputs_prev.Count() - 1)};
+    TransactionSpentOutputs owned_transaction_spent_outputs_prev{block_spent_outputs_prev.TxsSpentOutputs().back()};
     CheckHandle(owned_transaction_spent_outputs, owned_transaction_spent_outputs_prev);
     CheckRange(transaction_spent_outputs.Coins(), transaction_spent_outputs.Coins().size());
 

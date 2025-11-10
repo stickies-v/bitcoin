@@ -1095,6 +1095,7 @@ public:
     {
     }
 
+private:
     size_t Count() const
     {
         return btck_block_spent_outputs_count(get());
@@ -1105,6 +1106,7 @@ public:
         return TransactionSpentOutputsView{btck_block_spent_outputs_get_transaction_spent_outputs_at(get(), tx_undo_index)};
     }
 
+public:
     MAKE_RANGE_METHOD(TxsSpentOutputs, BlockSpentOutputs, &BlockSpentOutputs::Count, &BlockSpentOutputs::GetTxSpentOutputs, *this)
 };
 
