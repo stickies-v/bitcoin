@@ -573,7 +573,6 @@ private:
         return static_cast<const Derived*>(this)->get();
     }
 
-public:
     size_t CountOutputs() const
     {
         return btck_transaction_count_outputs(impl());
@@ -594,6 +593,7 @@ public:
         return TransactionInputView{btck_transaction_get_input_at(impl(), index)};
     }
 
+public:
     TxidView Txid() const
     {
         return TxidView{btck_transaction_get_txid(impl())};

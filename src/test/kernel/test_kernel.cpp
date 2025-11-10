@@ -395,20 +395,20 @@ BOOST_AUTO_TEST_CASE(btck_transaction_tests)
     auto tx2{Transaction{tx_data_2}};
     CheckHandle(tx, tx2);
 
-    BOOST_CHECK_EQUAL(tx.CountOutputs(), 2);
-    BOOST_CHECK_EQUAL(tx.CountInputs(), 1);
+    BOOST_CHECK_EQUAL(tx.Outputs().size(), 2);
+    BOOST_CHECK_EQUAL(tx.Inputs().size(), 1);
     auto broken_tx_data{std::span<std::byte>{tx_data.begin(), tx_data.begin() + 10}};
     BOOST_CHECK_THROW(Transaction{broken_tx_data}, std::runtime_error);
-    auto output{tx.GetOutput(tx.CountOutputs() - 1)};
+    auto output{tx.Outputs().back()};
     BOOST_CHECK_EQUAL(output.Amount(), 42130042);
     auto script_pubkey{output.GetScriptPubkey()};
     {
         auto tx_new{Transaction{tx_data}};
         // This is safe, because we now use copy assignment
-        TransactionOutput output = tx_new.GetOutput(tx_new.CountOutputs() - 1);
+        TransactionOutput output = tx_new.Outputs().back();
         ScriptPubkey script = output.GetScriptPubkey();
 
-        TransactionOutputView output2 = tx_new.GetOutput(tx_new.CountOutputs() - 1);
+        TransactionOutputView output2 = tx_new.Outputs().back();
         BOOST_CHECK_NE(output.get(), output2.get());
         BOOST_CHECK_EQUAL(output.Amount(), output2.Amount());
         TransactionOutput output3 = output2;
@@ -455,8 +455,6 @@ BOOST_AUTO_TEST_CASE(btck_transaction_tests)
     BOOST_REQUIRE(amount);
     BOOST_CHECK_EQUAL(amount, 42130042);
 
-    CheckRange(tx.Outputs(), tx.CountOutputs());
-
     ScriptPubkey script_pubkey_roundtrip{script_pubkey.ToBytes()};
     check_equal(script_pubkey_roundtrip.ToBytes(), script_pubkey.ToBytes());
 }
@@ -482,10 +480,11 @@ BOOST_AUTO_TEST_CASE(btck_transaction_output)
 BOOST_AUTO_TEST_CASE(btck_transaction_input)
 {
     Transaction tx{hex_string_to_byte_vec("020000000248c03e66fd371c7033196ce24298628e59ebefa00363026044e0f35e0325a65d000000006a473044022004893432347f39beaa280e99da595681ddb20fc45010176897e6e055d716dbfa022040a9e46648a5d10c33ef7cee5e6cf4b56bd513eae3ae044f0039824b02d0f44c012102982331a52822fd9b62e9b5d120da1d248558fac3da3a3c51cd7d9c8ad3da760efeffffffb856678c6e4c3c84e39e2ca818807049d6fba274b42af3c6d3f9d4b6513212d2000000006a473044022068bcedc7fe39c9f21ad318df2c2da62c2dc9522a89c28c8420ff9d03d2e6bf7b0220132afd752754e5cb1ea2fd0ed6a38ec666781e34b0e93dc9a08f2457842cf5660121033aeb9c079ea3e08ea03556182ab520ce5c22e6b0cb95cee6435ee17144d860cdfeffffff0260d50b00000000001976a914363cc8d55ea8d0500de728ef6d63804ddddbdc9888ac67040f00000000001976a914c303bdc5064bf9c9a8b507b5496bd0987285707988ac6acb0700")};
-    TransactionInput input_0 = tx.GetInput(0);
-    TransactionInput input_1 = tx.GetInput(1);
+    auto inputs{tx.Inputs()};
+    TransactionInput input_0 = inputs.at(0);
+    TransactionInput input_1 = inputs.at(1);
     CheckHandle(input_0, input_1);
-    CheckRange(tx.Inputs(), tx.CountInputs());
+    CheckRange(tx.Inputs(), inputs.size());
     OutPoint point_0 = input_0.OutPoint();
     OutPoint point_1 = input_1.OutPoint();
     CheckHandle(point_0, point_1);
@@ -729,14 +728,14 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     Block block{raw_block};
     TransactionView tx{block.GetTransaction(block.CountTransactions() - 1)};
     BOOST_CHECK_EQUAL(byte_span_to_hex_string_reversed(tx.Txid().ToBytes()), "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098");
-    BOOST_CHECK_EQUAL(tx.CountInputs(), 1);
+    BOOST_CHECK_EQUAL(tx.Inputs().size(), 1);
     Transaction tx2 = tx;
-    BOOST_CHECK_EQUAL(tx2.CountInputs(), 1);
+    BOOST_CHECK_EQUAL(tx.Inputs().size(), 1);
     for (auto transaction : block.Transactions()) {
-        BOOST_CHECK_EQUAL(transaction.CountInputs(), 1);
+        BOOST_CHECK_EQUAL(transaction.Inputs().size(), 1);
     }
     auto output_counts = *(block.Transactions() | std::views::transform([](const auto& tx) {
-                               return tx.CountOutputs();
+                               return tx.Outputs().size();
                            })).begin();
     BOOST_CHECK_EQUAL(output_counts, 1);
 
@@ -893,7 +892,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
                 std::optional<Transaction> tx = find_transaction(point.Txid());
                 BOOST_CHECK(tx.has_value());
                 BOOST_CHECK(point.Txid() == tx->Txid());
-                spent_outputs.emplace_back(tx->GetOutput(point.index()));
+                spent_outputs.emplace_back(tx->Outputs().at(point.index()));
             }
             BOOST_CHECK(inputs.size() == spent_outputs.size());
             ScriptVerifyStatus status = ScriptVerifyStatus::OK;
