@@ -661,22 +661,23 @@ void chainman_reindex_test(TestDirectory& test_directory)
 
     // Sanity check some block retrievals
     auto chain{chainman->GetChain()};
-    BOOST_CHECK_THROW(chain.GetByHeight(1000), std::runtime_error);
+    auto entries{chain.Entries()};
+    BOOST_CHECK_THROW(entries.at(1000), std::out_of_range);
     auto genesis_index{chain.Genesis()};
     BOOST_CHECK(!genesis_index.GetPrevious());
     auto genesis_block_raw{chainman->ReadBlock(genesis_index).value().ToBytes()};
-    auto first_index{chain.GetByHeight(0)};
+    auto first_index{entries.front()};
     auto first_block_raw{chainman->ReadBlock(genesis_index).value().ToBytes()};
     check_equal(genesis_block_raw, first_block_raw);
     auto height{first_index.GetHeight()};
     BOOST_CHECK_EQUAL(height, 0);
 
-    auto next_index{chain.GetByHeight(first_index.GetHeight() + 1)};
+    auto next_index{entries.at(first_index.GetHeight() + 1)};
     BOOST_CHECK(chain.Contains(next_index));
     auto next_block_data{chainman->ReadBlock(next_index).value().ToBytes()};
     auto tip_index{chain.Tip()};
     auto tip_block_data{chainman->ReadBlock(tip_index).value().ToBytes()};
-    auto second_index{chain.GetByHeight(1)};
+    auto second_index{entries.at(1)};
     auto second_block{chainman->ReadBlock(second_index).value()};
     auto second_block_data{second_block.ToBytes()};
     auto second_height{second_index.GetHeight()};
@@ -941,7 +942,9 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
         }
     }
 
-    CheckRange(chain.Entries(), chain.CountEntries());
+
+    CheckRange(chain.Entries(), chain.Entries().size());
+
 
     for (const BlockTreeEntry entry : chain.Entries()) {
         std::optional<Block> block{chainman->ReadBlock(entry)};
@@ -963,7 +966,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
         BOOST_CHECK_EQUAL(entry.GetHeight(), count);
         ++count;
     }
-    BOOST_CHECK_EQUAL(count, chain.CountEntries());
+    BOOST_CHECK_EQUAL(count, chain.Entries().size());
 
 
     std::filesystem::remove_all(test_directory.m_directory / "blocks" / "blk00000.dat");

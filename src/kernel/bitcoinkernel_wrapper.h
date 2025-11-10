@@ -979,16 +979,19 @@ public:
         return btck_chain_get_height(get());
     }
 
+private:
     int CountEntries() const
     {
         return btck_chain_get_height(get()) + 1;
     }
 
+public:
     BlockTreeEntry Genesis() const
     {
         return btck_chain_get_genesis(get());
     }
 
+private:
     BlockTreeEntry GetByHeight(int height) const
     {
         auto index{btck_chain_get_by_height(get(), height)};
@@ -996,6 +999,7 @@ public:
         return index;
     }
 
+public:
     bool Contains(BlockTreeEntry& entry) const
     {
         return btck_chain_contains(get(), entry.get());
