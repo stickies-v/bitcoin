@@ -711,6 +711,7 @@ public:
 
     Block(btck_Block* block) : Handle{block} {}
 
+private:
     size_t CountTransactions() const
     {
         return btck_block_count_transactions(get());
@@ -721,6 +722,7 @@ public:
         return TransactionView{btck_block_get_transaction_at(get(), index)};
     }
 
+public:
     MAKE_RANGE_METHOD(Transactions, Block, &Block::CountTransactions, &Block::GetTransaction, *this)
 
     BlockHash GetHash() const

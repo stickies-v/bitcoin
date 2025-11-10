@@ -579,7 +579,6 @@ BOOST_AUTO_TEST_CASE(btck_block)
     Block block_100{hex_string_to_byte_vec(REGTEST_BLOCK_DATA[100])};
     CheckHandle(block, block_100);
     Block block_tx{hex_string_to_byte_vec(REGTEST_BLOCK_DATA[205])};
-    CheckRange(block_tx.Transactions(), block_tx.CountTransactions());
 }
 
 Context create_context(std::shared_ptr<TestKernelNotifications> notifications, ChainType chain_type, std::shared_ptr<TestValidationInterface> validation_interface = nullptr)
@@ -726,7 +725,7 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     // mainnet block 1
     auto raw_block = hex_string_to_byte_vec("010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000");
     Block block{raw_block};
-    TransactionView tx{block.GetTransaction(block.CountTransactions() - 1)};
+    TransactionView tx{block.Transactions().back()};
     BOOST_CHECK_EQUAL(byte_span_to_hex_string_reversed(tx.Txid().ToBytes()), "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098");
     BOOST_CHECK_EQUAL(tx.Inputs().size(), 1);
     Transaction tx2 = tx;
