@@ -4,6 +4,7 @@
 
 #include <kernel/bitcoinkernel.h>
 #include <kernel/bitcoinkernel_wrapper.h>
+#include <kernel/log.h>
 
 #define BOOST_TEST_MODULE Bitcoin Kernel Test Suite
 #include <boost/test/included/unit_test.hpp>
@@ -973,3 +974,166 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     std::filesystem::remove_all(test_directory.m_directory / "blocks" / "rev00000.dat");
     BOOST_CHECK_THROW(chainman->ReadBlockSpentOutputs(tip), std::runtime_error);
 }
+
+BOOST_AUTO_TEST_SUITE(log_tests)
+
+BOOST_AUTO_TEST_CASE(level_filtering)
+{
+    kernel::Logger logger;
+    std::vector<kernel::LogEntry> received;
+
+    logger.SetMinLevel(kernel::Level::Info);
+    auto handle = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        received.push_back(entry);
+    });
+
+    // Debug is below Info, should be filtered
+    logger.Log(kernel::Level::Debug, kernel::Category::KERNEL, std::source_location::current(), "debug msg");
+    BOOST_CHECK(received.empty());
+
+    // Info should pass
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "info msg");
+    BOOST_CHECK_EQUAL(received.size(), 1);
+    BOOST_CHECK_EQUAL(received[0].message, "info msg");
+    BOOST_CHECK(received[0].level == kernel::Level::Info);
+
+    // Warning should pass
+    logger.Log(kernel::Level::Warning, kernel::Category::ALL, std::source_location::current(), "warning msg");
+    BOOST_CHECK_EQUAL(received.size(), 2);
+
+    logger.UnregisterCallback(handle);
+}
+
+BOOST_AUTO_TEST_CASE(callback_registration)
+{
+    kernel::Logger logger;
+    std::vector<std::string> received1, received2;
+
+    auto handle1 = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        received1.push_back(entry.message);
+    });
+
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "msg1");
+    BOOST_CHECK_EQUAL(received1.size(), 1);
+    BOOST_CHECK(received2.empty());
+
+    auto handle2 = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        received2.push_back(entry.message);
+    });
+
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "msg2");
+    BOOST_CHECK_EQUAL(received1.size(), 2);
+    BOOST_CHECK_EQUAL(received2.size(), 1);
+
+    logger.UnregisterCallback(handle1);
+
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "msg3");
+    BOOST_CHECK_EQUAL(received1.size(), 2); // No longer receiving
+    BOOST_CHECK_EQUAL(received2.size(), 2);
+
+    logger.UnregisterCallback(handle2);
+}
+
+BOOST_AUTO_TEST_CASE(no_callback_drops_messages)
+{
+    kernel::Logger logger;
+    std::vector<kernel::LogEntry> received;
+
+    // Log without callback - should be dropped
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "dropped");
+
+    // Register callback - should NOT receive the earlier message
+    auto handle = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        received.push_back(entry);
+    });
+
+    BOOST_CHECK(received.empty());
+
+    // New message should be received
+    logger.Log(kernel::Level::Info, kernel::Category::ALL, std::source_location::current(), "received");
+    BOOST_CHECK_EQUAL(received.size(), 1);
+    BOOST_CHECK_EQUAL(received[0].message, "received");
+
+    logger.UnregisterCallback(handle);
+}
+
+BOOST_AUTO_TEST_CASE(log_entry_fields)
+{
+    kernel::Logger logger;
+    kernel::LogEntry captured;
+
+    auto handle = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        captured = entry;
+    });
+
+    auto before = std::chrono::system_clock::now();
+    logger.Log(kernel::Level::Error, kernel::Category::ALL, std::source_location::current(), "test message");
+    auto after = std::chrono::system_clock::now();
+
+    BOOST_CHECK(captured.level == kernel::Level::Error);
+    BOOST_CHECK(captured.category == kernel::Category::ALL);
+    BOOST_CHECK_EQUAL(captured.message, "test message");
+    BOOST_CHECK(captured.timestamp >= before && captured.timestamp <= after);
+    // source_loc should point to this file
+    BOOST_CHECK(std::string_view(captured.source_loc.file_name()).find("test_kernel.cpp") != std::string_view::npos);
+
+    logger.UnregisterCallback(handle);
+}
+
+BOOST_AUTO_TEST_CASE(global_logger)
+{
+    // GetLogger should return the same instance
+    kernel::Logger& logger1 = kernel::GetLogger();
+    kernel::Logger& logger2 = kernel::GetLogger();
+    BOOST_CHECK_EQUAL(&logger1, &logger2);
+}
+
+BOOST_AUTO_TEST_CASE(macro_logging)
+{
+    kernel::Logger& logger = kernel::GetLogger();
+    std::vector<kernel::LogEntry> received;
+
+    auto handle = logger.RegisterCallback([&](const kernel::LogEntry& entry) {
+        received.push_back(entry);
+    });
+
+    // Test KernelLogInfo
+    KernelLogInfo("info message");
+    BOOST_CHECK_EQUAL(received.size(), 1);
+    BOOST_CHECK(received[0].level == kernel::Level::Info);
+    BOOST_CHECK(received[0].category == kernel::Category::ALL);
+    BOOST_CHECK_EQUAL(received[0].message, "info message");
+
+    // Test KernelLogWarning with formatting
+    KernelLogWarning("warning: %d errors", 42);
+    BOOST_CHECK_EQUAL(received.size(), 2);
+    BOOST_CHECK(received[1].level == kernel::Level::Warning);
+    BOOST_CHECK_EQUAL(received[1].message, "warning: 42 errors");
+
+    // Test KernelLogError
+    KernelLogError("error msg");
+    BOOST_CHECK_EQUAL(received.size(), 3);
+    BOOST_CHECK(received[2].level == kernel::Level::Error);
+
+    // Test KernelLogDebug (requires category)
+    KernelLogDebug(kernel::Category::MEMPOOL, "debug: %s", "test");
+    BOOST_CHECK_EQUAL(received.size(), 4);
+    BOOST_CHECK(received[3].level == kernel::Level::Debug);
+    BOOST_CHECK(received[3].category == kernel::Category::MEMPOOL);
+    BOOST_CHECK_EQUAL(received[3].message, "debug: test");
+
+    // Test KernelLogTrace (requires category)
+    logger.SetMinLevel(kernel::Level::Trace);
+    KernelLogTrace(kernel::Category::COINDB, "trace msg");
+    BOOST_CHECK_EQUAL(received.size(), 5);
+    BOOST_CHECK(received[4].level == kernel::Level::Trace);
+    BOOST_CHECK(received[4].category == kernel::Category::COINDB);
+
+    // Verify source location is captured
+    BOOST_CHECK(std::string_view(received[0].source_loc.file_name()).find("test_kernel.cpp") != std::string_view::npos);
+
+    logger.UnregisterCallback(handle);
+    logger.SetMinLevel(kernel::Level::Debug); // Reset to default
+}
+
+BOOST_AUTO_TEST_SUITE_END()
