@@ -5,6 +5,8 @@
 #ifndef BITCOIN_KERNEL_LOG_H
 #define BITCOIN_KERNEL_LOG_H
 
+#include <kernel/bitcoinkernel.h>
+
 #include <threadsafety.h>
 #include <tinyformat.h>
 #include <util/string.h>
@@ -18,28 +20,28 @@
 
 namespace kernel {
 
-enum class Level {
-    Trace,
-    Debug,
-    Info,
-    Warning,
-    Error,
+enum class Level : btck_LogLevel {
+    Trace = btck_LogLevel_TRACE,
+    Debug = btck_LogLevel_DEBUG,
+    Info = btck_LogLevel_INFO,
+    Warning = btck_LogLevel_WARNING,
+    Error = btck_LogLevel_ERROR,
 };
 
-enum class Category {
-    ALL,
-    BENCH,
-    BLOCKSTORAGE,
-    COINDB,
-    ESTIMATEFEE,
-    KERNEL,
-    LEVELDB,
-    MEMPOOL,
-    PRUNE,
-    RAND,
-    REINDEX,
-    TXPACKAGES,
-    VALIDATION,
+enum class Category : btck_LogCategory {
+    ALL = btck_LogCategory_ALL,
+    BENCH = btck_LogCategory_BENCH,
+    BLOCKSTORAGE = btck_LogCategory_BLOCKSTORAGE,
+    COINDB = btck_LogCategory_COINDB,
+    ESTIMATEFEE = btck_LogCategory_ESTIMATEFEE,
+    KERNEL = btck_LogCategory_KERNEL,
+    LEVELDB = btck_LogCategory_LEVELDB,
+    MEMPOOL = btck_LogCategory_MEMPOOL,
+    PRUNE = btck_LogCategory_PRUNE,
+    RAND = btck_LogCategory_RAND,
+    REINDEX = btck_LogCategory_REINDEX,
+    TXPACKAGES = btck_LogCategory_TXPACKAGES,
+    VALIDATION = btck_LogCategory_VALIDATION,
 };
 
 struct LogEntry {

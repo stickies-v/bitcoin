@@ -93,9 +93,9 @@ void check_equal(std::span<const std::byte> _actual, std::span<const std::byte> 
 class TestLog
 {
 public:
-    void LogMessage(std::string_view message)
+    void LogMessage(const btck_LogEntry& entry)
     {
-        std::cout << "kernel: " << message;
+        std::cout << "kernel: " << std::string_view{entry.message, entry.message_len} << "\n";
     }
 };
 
@@ -527,24 +527,10 @@ BOOST_AUTO_TEST_CASE(btck_script_verify_tests)
 
 BOOST_AUTO_TEST_CASE(logging_tests)
 {
-    btck_LoggingOptions logging_options = {
-        .log_timestamps = true,
-        .log_time_micros = true,
-        .log_threadnames = false,
-        .log_sourcelocations = false,
-        .always_print_category_levels = true,
-    };
-
-    logging_set_options(logging_options);
-    logging_set_level_category(LogCategory::BENCH, LogLevel::TRACE_LEVEL);
-    logging_disable_category(LogCategory::BENCH);
-    logging_enable_category(LogCategory::VALIDATION);
-    logging_disable_category(LogCategory::VALIDATION);
+    logging_set_min_level(LogLevel::TRACE_LEVEL);
 
     // Check that connecting, connecting another, and then disconnecting and connecting a logger again works.
     {
-        logging_set_level_category(LogCategory::KERNEL, LogLevel::TRACE_LEVEL);
-        logging_enable_category(LogCategory::KERNEL);
         Logger logger{std::make_unique<TestLog>()};
         Logger logger_2{std::make_unique<TestLog>()};
     }

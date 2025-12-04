@@ -26,19 +26,23 @@ enum class LogCategory : btck_LogCategory {
     BENCH = btck_LogCategory_BENCH,
     BLOCKSTORAGE = btck_LogCategory_BLOCKSTORAGE,
     COINDB = btck_LogCategory_COINDB,
+    ESTIMATEFEE = btck_LogCategory_ESTIMATEFEE,
+    KERNEL = btck_LogCategory_KERNEL,
     LEVELDB = btck_LogCategory_LEVELDB,
     MEMPOOL = btck_LogCategory_MEMPOOL,
     PRUNE = btck_LogCategory_PRUNE,
     RAND = btck_LogCategory_RAND,
     REINDEX = btck_LogCategory_REINDEX,
-    VALIDATION = btck_LogCategory_VALIDATION,
-    KERNEL = btck_LogCategory_KERNEL
+    TXPACKAGES = btck_LogCategory_TXPACKAGES,
+    VALIDATION = btck_LogCategory_VALIDATION
 };
 
 enum class LogLevel : btck_LogLevel {
     TRACE_LEVEL = btck_LogLevel_TRACE,
     DEBUG_LEVEL = btck_LogLevel_DEBUG,
-    INFO_LEVEL = btck_LogLevel_INFO
+    INFO_LEVEL = btck_LogLevel_INFO,
+    WARNING_LEVEL = btck_LogLevel_WARNING,
+    ERROR_LEVEL = btck_LogLevel_ERROR
 };
 
 enum class ChainType : btck_ChainType {
@@ -734,34 +738,14 @@ public:
     }
 };
 
-inline void logging_disable()
+inline void logging_set_min_level(LogLevel level)
 {
-    btck_logging_disable();
-}
-
-inline void logging_set_options(const btck_LoggingOptions& logging_options)
-{
-    btck_logging_set_options(logging_options);
-}
-
-inline void logging_set_level_category(LogCategory category, LogLevel level)
-{
-    btck_logging_set_level_category(static_cast<btck_LogCategory>(category), static_cast<btck_LogLevel>(level));
-}
-
-inline void logging_enable_category(LogCategory category)
-{
-    btck_logging_enable_category(static_cast<btck_LogCategory>(category));
-}
-
-inline void logging_disable_category(LogCategory category)
-{
-    btck_logging_disable_category(static_cast<btck_LogCategory>(category));
+    btck_logging_set_min_level(static_cast<btck_LogLevel>(level));
 }
 
 template <typename T>
-concept Log = requires(T a, std::string_view message) {
-    { a.LogMessage(message) } -> std::same_as<void>;
+concept Log = requires(T a, const btck_LogEntry& entry) {
+    { a.LogMessage(entry) } -> std::same_as<void>;
 };
 
 template <Log T>
@@ -770,7 +754,7 @@ class Logger : UniqueHandle<btck_LoggingConnection, btck_logging_connection_dest
 public:
     Logger(std::unique_ptr<T> log)
         : UniqueHandle{btck_logging_connection_create(
-              +[](void* user_data, const char* message, size_t message_len) { static_cast<T*>(user_data)->LogMessage({message, message_len}); },
+              +[](void* user_data, const btck_LogEntry* entry) { static_cast<T*>(user_data)->LogMessage(*entry); },
               log.release(),
               +[](void* user_data) { delete static_cast<T*>(user_data); })}
     {
