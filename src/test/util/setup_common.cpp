@@ -22,6 +22,7 @@
 #include <node/blockstorage.h>
 #include <node/chainstate.h>
 #include <node/context.h>
+#include <node/kernel_logging_bridge.h>
 #include <node/kernel_notifications.h>
 #include <node/mempool_args.h>
 #include <node/miner.h>
@@ -197,6 +198,7 @@ BasicTestingSetup::BasicTestingSetup(const ChainType chainType, TestOpts opts)
     LogInstance().StartLogging();
     m_node.warnings = std::make_unique<node::Warnings>();
     m_node.kernel = std::make_unique<kernel::Context>();
+    m_node.kernel_logging_bridge = std::make_unique<node::KernelLoggingBridge>();
     m_node.ecc_context = std::make_unique<ECC_Context>();
     SetupEnvironment();
 

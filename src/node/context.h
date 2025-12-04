@@ -40,6 +40,7 @@ class SignalInterrupt;
 }
 
 namespace node {
+class KernelLoggingBridge;
 class KernelNotifications;
 class Warnings;
 
@@ -56,6 +57,8 @@ class Warnings;
 struct NodeContext {
     //! libbitcoin_kernel context
     std::unique_ptr<kernel::Context> kernel;
+    //! Forwards kernel log messages to node logging infrastructure
+    std::unique_ptr<KernelLoggingBridge> kernel_logging_bridge;
     std::unique_ptr<ECC_Context> ecc_context;
     //! Init interface for initializing current process and connecting to other processes.
     interfaces::Init* init{nullptr};

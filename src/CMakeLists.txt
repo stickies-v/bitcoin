@@ -201,6 +201,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   kernel/context.cpp
   kernel/cs_main.cpp
   kernel/disconnected_transactions.cpp
+  kernel/log.cpp
   kernel/mempool_removal_reason.cpp
   mapport.cpp
   net.cpp
@@ -220,6 +221,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   node/eviction.cpp
   node/interface_ui.cpp
   node/interfaces.cpp
+  node/kernel_logging_bridge.cpp
   node/kernel_notifications.cpp
   node/mempool_args.cpp
   node/mempool_persist.cpp

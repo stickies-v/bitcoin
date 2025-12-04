@@ -17,6 +17,7 @@
 #include <kernel/context.h>
 #include <node/context.h>
 #include <node/interface_ui.h>
+#include <node/kernel_logging_bridge.h>
 #include <node/warnings.h>
 #include <noui.h>
 #include <util/check.h>
@@ -197,6 +198,7 @@ static bool AppInit(NodeContext& node)
         node.warnings = std::make_unique<node::Warnings>();
 
         node.kernel = std::make_unique<kernel::Context>();
+        node.kernel_logging_bridge = std::make_unique<node::KernelLoggingBridge>();
         node.ecc_context = std::make_unique<ECC_Context>();
         if (!AppInitSanityChecks(*node.kernel))
         {

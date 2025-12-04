@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <init/common.h>
+#include <kernel/log.h>
 #include <logging.h>
 #include <logging/timer.h>
 #include <scheduler.h>
@@ -482,6 +483,36 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
             TestLogFromLocation(location, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
         }
     }
+}
+
+BOOST_FIXTURE_TEST_CASE(logging_kernel_bridge, LogSetup)
+{
+    // Test that kernel logging flows through to node logging via the bridge.
+
+    // Only enable VALIDATION and KERNEL, leave MEMPOOL disabled
+    LogInstance().EnableCategory(BCLog::VALIDATION);
+    LogInstance().EnableCategory(BCLog::KERNEL);
+
+    // Log via kernel logging macros - MEMPOOL should be filtered out by the bridge
+    KernelLogInfo("kernel info message");
+    KernelLogDebug(kernel::Category::VALIDATION, "kernel validation message");
+    KernelLogDebug(kernel::Category::MEMPOOL, "kernel mempool: %d", 42);
+
+    std::vector<std::string> log_lines{ReadDebugLogLines()};
+    BOOST_REQUIRE_EQUAL(log_lines.size(), 2);
+
+    BOOST_CHECK(log_lines[0].find("kernel info message") != std::string::npos);
+    BOOST_CHECK(log_lines[1].find("[validation]") != std::string::npos);
+    BOOST_CHECK(log_lines[1].find("kernel validation message") != std::string::npos);
+
+    // Now enable MEMPOOL and verify it gets logged
+    LogInstance().EnableCategory(BCLog::MEMPOOL);
+    KernelLogDebug(kernel::Category::MEMPOOL, "kernel mempool enabled");
+
+    log_lines = ReadDebugLogLines();
+    BOOST_REQUIRE_EQUAL(log_lines.size(), 3);
+    BOOST_CHECK(log_lines[2].find("[mempool]") != std::string::npos);
+    BOOST_CHECK(log_lines[2].find("kernel mempool enabled") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
