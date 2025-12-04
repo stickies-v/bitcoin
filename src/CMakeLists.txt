@@ -112,6 +112,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   external_signer.cpp
   init/common.cpp
   kernel/chainparams.cpp
+  kernel/log.cpp  # necessary because some kernel sources (e.g. kernel/chainparams.cpp) are in common
   key.cpp
   key_io.cpp
   merkleblock.cpp

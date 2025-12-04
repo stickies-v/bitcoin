@@ -5,7 +5,7 @@
 #include <kernel/context.h>
 
 #include <crypto/sha256.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <random.h>
 
 #include <mutex>
@@ -17,7 +17,7 @@ Context::Context()
     static std::once_flag globals_initialized{};
     std::call_once(globals_initialized, []() {
         std::string sha256_algo = SHA256AutoDetect();
-        LogInfo("Using the '%s' SHA256 implementation\n", sha256_algo);
+        KernelLogInfo("Using the '%s' SHA256 implementation\n", sha256_algo);
         RandomInit();
     });
 }

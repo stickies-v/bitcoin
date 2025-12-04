@@ -8,9 +8,9 @@
 #include <chain.h>
 #include <consensus/validation.h>
 #include <kernel/chain.h>
+#include <kernel/log.h>
 #include <kernel/mempool_entry.h>
 #include <kernel/mempool_removal_reason.h>
-#include <logging.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <util/check.h>
@@ -167,7 +167,7 @@ void ValidationSignals::SyncWithValidationInterfaceQueue()
     } while (0)
 
 #define LOG_EVENT(fmt, ...) \
-    LogDebug(BCLog::VALIDATION, fmt "\n", __VA_ARGS__)
+    KernelLogDebug(kernel::Category::VALIDATION, fmt "\n", __VA_ARGS__)
 
 void ValidationSignals::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload) {
     // Dependencies exist that require UpdatedBlockTip events to be delivered in the order in which

@@ -9,7 +9,7 @@
 #include <coins.h>
 #include <consensus/params.h>
 #include <kernel/caches.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <node/blockstorage.h>
 #include <sync.h>
 #include <threadsafety.h>
@@ -84,7 +84,7 @@ static ChainstateLoadResult CompleteChainstateInitialization(
     // block tree into BlockIndex()!
 
     for (Chainstate* chainstate : chainman.GetAll()) {
-        LogInfo("Initializing chainstate %s", chainstate->ToString());
+        KernelLogInfo("Initializing chainstate %s", chainstate->ToString());
 
         try {
             chainstate->InitCoinsDB(
@@ -92,7 +92,7 @@ static ChainstateLoadResult CompleteChainstateInitialization(
                 /*in_memory=*/options.coins_db_in_memory,
                 /*should_wipe=*/options.wipe_chainstate_db);
         } catch (dbwrapper_error& err) {
-            LogError("%s\n", err.what());
+            KernelLogError("%s\n", err.what());
             return {ChainstateLoadStatus::FAILURE, _("Error opening coins database")};
         }
 
@@ -145,19 +145,19 @@ ChainstateLoadResult LoadChainstate(ChainstateManager& chainman, const CacheSize
                                     const ChainstateLoadOptions& options)
 {
     if (!chainman.AssumedValidBlock().IsNull()) {
-        LogInfo("Assuming ancestors of block %s have valid signatures.", chainman.AssumedValidBlock().GetHex());
+        KernelLogInfo("Assuming ancestors of block %s have valid signatures.", chainman.AssumedValidBlock().GetHex());
     } else {
-        LogInfo("Validating signatures for all blocks.");
+        KernelLogInfo("Validating signatures for all blocks.");
     }
-    LogInfo("Setting nMinimumChainWork=%s", chainman.MinimumChainWork().GetHex());
+    KernelLogInfo("Setting nMinimumChainWork=%s", chainman.MinimumChainWork().GetHex());
     if (chainman.MinimumChainWork() < UintToArith256(chainman.GetConsensus().nMinimumChainWork)) {
-        LogPrintf("Warning: nMinimumChainWork set below default value of %s\n", chainman.GetConsensus().nMinimumChainWork.GetHex());
+        KernelLogWarning("Warning: nMinimumChainWork set below default value of %s\n", chainman.GetConsensus().nMinimumChainWork.GetHex());
     }
     if (chainman.m_blockman.GetPruneTarget() == BlockManager::PRUNE_TARGET_MANUAL) {
-        LogInfo("Block pruning enabled. Use RPC call pruneblockchain(height) to manually prune block and undo files.");
+        KernelLogInfo("Block pruning enabled. Use RPC call pruneblockchain(height) to manually prune block and undo files.");
     } else if (chainman.m_blockman.GetPruneTarget()) {
-        LogInfo("Prune configured to target %u MiB on disk for block and undo files.",
-                chainman.m_blockman.GetPruneTarget() / 1024 / 1024);
+        KernelLogInfo("Prune configured to target %u MiB on disk for block and undo files.",
+                      chainman.m_blockman.GetPruneTarget() / 1024 / 1024);
     }
 
     LOCK(cs_main);
@@ -172,7 +172,7 @@ ChainstateLoadResult LoadChainstate(ChainstateManager& chainman, const CacheSize
     bool has_snapshot = chainman.DetectSnapshotChainstate();
 
     if (has_snapshot && options.wipe_chainstate_db) {
-        LogInfo("[snapshot] deleting snapshot chainstate due to reindexing");
+        KernelLogInfo("[snapshot] deleting snapshot chainstate due to reindexing");
         if (!chainman.DeleteSnapshotChainstate()) {
             return {ChainstateLoadStatus::FAILURE_FATAL, Untranslated("Couldn't remove snapshot chainstate.")};
         }
@@ -196,7 +196,7 @@ ChainstateLoadResult LoadChainstate(ChainstateManager& chainman, const CacheSize
     if (snapshot_completion == SnapshotCompletionResult::SKIPPED) {
         // do nothing; expected case
     } else if (snapshot_completion == SnapshotCompletionResult::SUCCESS) {
-        LogInfo("[snapshot] cleaning up unneeded background chainstate, then reinitializing");
+        KernelLogInfo("[snapshot] cleaning up unneeded background chainstate, then reinitializing");
         if (!chainman.ValidatedSnapshotCleanup()) {
             return {ChainstateLoadStatus::FAILURE_FATAL, Untranslated("Background chainstate cleanup failed unexpectedly.")};
         }

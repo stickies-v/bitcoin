@@ -12,7 +12,7 @@
 #include <crypto/chacha20.h>
 #include <crypto/sha256.h>
 #include <crypto/sha512.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <randomenv.h>
 #include <span.h>
 #include <support/allocators/secure.h>
@@ -53,7 +53,7 @@ static const int NUM_OS_RANDOM_BYTES = 32;
 
 [[noreturn]] void RandFailure()
 {
-    LogError("Failed to read randomness, aborting\n");
+    KernelLogError("Failed to read randomness, aborting\n");
     std::abort();
 }
 
@@ -107,10 +107,10 @@ void ReportHardwareRand()
     // This must be done in a separate function, as InitHardwareRand() may be indirectly called
     // from global constructors, before logging is initialized.
     if (g_rdseed_supported) {
-        LogInfo("Using RdSeed as an additional entropy source");
+        KernelLogInfo("Using RdSeed as an additional entropy source");
     }
     if (g_rdrand_supported) {
-        LogInfo("Using RdRand as an additional entropy source");
+        KernelLogInfo("Using RdRand as an additional entropy source");
     }
 }
 
@@ -527,7 +527,7 @@ void SeedPeriodic(CSHA512& hasher, RNGState& rng) noexcept
     // Dynamic environment data (clocks, resource usage, ...)
     auto old_size = hasher.Size();
     RandAddDynamicEnv(hasher);
-    LogDebug(BCLog::RAND, "Feeding %i bytes of dynamic environment data into RNG\n", hasher.Size() - old_size);
+    KernelLogDebug(kernel::Category::RAND, "Feeding %i bytes of dynamic environment data into RNG\n", hasher.Size() - old_size);
 
     // Strengthen for 10 ms
     SeedStrengthen(hasher, rng, 10ms);
@@ -547,7 +547,7 @@ void SeedStartup(CSHA512& hasher, RNGState& rng) noexcept
 
     // Static environment data
     RandAddStaticEnv(hasher);
-    LogDebug(BCLog::RAND, "Feeding %i bytes of environment data into RNG\n", hasher.Size() - old_size);
+    KernelLogDebug(kernel::Category::RAND, "Feeding %i bytes of environment data into RNG\n", hasher.Size() - old_size);
 
     // Strengthen for 100 ms
     SeedStrengthen(hasher, rng, 100ms);

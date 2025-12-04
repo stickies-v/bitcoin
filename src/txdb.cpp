@@ -7,7 +7,7 @@
 
 #include <coins.h>
 #include <dbwrapper.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <primitives/transaction.h>
 #include <random.h>
 #include <serialize.h>
@@ -102,7 +102,7 @@ bool CCoinsViewDB::BatchWrite(CoinsViewCacheCursor& cursor, const uint256 &hashB
         std::vector<uint256> old_heads = GetHeadBlocks();
         if (old_heads.size() == 2) {
             if (old_heads[0] != hashBlock) {
-                LogPrintLevel(BCLog::COINDB, BCLog::Level::Error, "The coins database detected an inconsistent state, likely due to a previous crash or shutdown. You will need to restart bitcoind with the -reindex-chainstate or -reindex configuration option.\n");
+                KernelLogError("The coins database detected an inconsistent state, likely due to a previous crash or shutdown. You will need to restart bitcoind with the -reindex-chainstate or -reindex configuration option.\n");
             }
             assert(old_heads[0] == hashBlock);
             old_tip = old_heads[1];
@@ -130,14 +130,14 @@ bool CCoinsViewDB::BatchWrite(CoinsViewCacheCursor& cursor, const uint256 &hashB
         count++;
         it = cursor.NextAndMaybeErase(*it);
         if (batch.ApproximateSize() > m_options.batch_write_bytes) {
-            LogDebug(BCLog::COINDB, "Writing partial batch of %.2f MiB\n", batch.ApproximateSize() * (1.0 / 1048576.0));
+            KernelLogDebug(kernel::Category::COINDB, "Writing partial batch of %.2f MiB\n", batch.ApproximateSize() * (1.0 / 1048576.0));
 
             m_db->WriteBatch(batch);
             batch.Clear();
             if (m_options.simulate_crash_ratio) {
                 static FastRandomContext rng;
                 if (rng.randrange(m_options.simulate_crash_ratio) == 0) {
-                    LogPrintf("Simulating a crash. Goodbye.\n");
+                    KernelLogInfo("Simulating a crash. Goodbye.\n");
                     _Exit(0);
                 }
             }
@@ -148,9 +148,9 @@ bool CCoinsViewDB::BatchWrite(CoinsViewCacheCursor& cursor, const uint256 &hashB
     batch.Erase(DB_HEAD_BLOCKS);
     batch.Write(DB_BEST_BLOCK, hashBlock);
 
-    LogDebug(BCLog::COINDB, "Writing final batch of %.2f MiB\n", batch.ApproximateSize() * (1.0 / 1048576.0));
+    KernelLogDebug(kernel::Category::COINDB, "Writing final batch of %.2f MiB\n", batch.ApproximateSize() * (1.0 / 1048576.0));
     bool ret = m_db->WriteBatch(batch);
-    LogDebug(BCLog::COINDB, "Committed %u changed transaction outputs (out of %u) to coin database...\n", (unsigned int)changed, (unsigned int)count);
+    KernelLogDebug(kernel::Category::COINDB, "Committed %u changed transaction outputs (out of %u) to coin database...\n", (unsigned int)changed, (unsigned int)count);
     return ret;
 }
 

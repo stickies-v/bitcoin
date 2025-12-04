@@ -4,7 +4,7 @@
 
 #include <dbwrapper.h>
 
-#include <logging.h>
+#include <kernel/log.h>
 #include <random.h>
 #include <serialize.h>
 #include <span.h>
@@ -47,8 +47,8 @@ static void HandleError(const leveldb::Status& status)
     if (status.ok())
         return;
     const std::string errmsg = "Fatal LevelDB error: " + status.ToString();
-    LogPrintf("%s\n", errmsg);
-    LogPrintf("You can use -debug=leveldb to get more complete diagnostic messages\n");
+    KernelLogInfo("%s\n", errmsg);
+    KernelLogInfo("You can use -debug=leveldb to get more complete diagnostic messages\n");
     throw dbwrapper_error(errmsg);
 }
 
@@ -57,9 +57,9 @@ public:
     // This code is adapted from posix_logger.h, which is why it is using vsprintf.
     // Please do not do this in normal code
     void Logv(const char * format, va_list ap) override {
-            if (!LogAcceptCategory(BCLog::LEVELDB, BCLog::Level::Debug)) {
-                return;
-            }
+        if (!kernel::GetLogger().WillLog(kernel::Level::Debug)) {
+            return;
+        }
             char buffer[500];
             for (int iter = 0; iter < 2; iter++) {
                 char* base;
@@ -101,7 +101,7 @@ public:
 
                 assert(p <= limit);
                 base[std::min(bufsize - 1, (int)(p - base))] = '\0';
-                LogDebug(BCLog::LEVELDB, "%s\n", util::RemoveSuffixView(base, "\n"));
+                KernelLogDebug(kernel::Category::LEVELDB, "%s\n", util::RemoveSuffixView(base, "\n"));
                 if (base != buffer) {
                     delete[] base;
                 }
@@ -131,8 +131,8 @@ static void SetMaxOpenFiles(leveldb::Options *options) {
         options->max_open_files = 64;
     }
 #endif
-    LogDebug(BCLog::LEVELDB, "LevelDB using max_open_files=%d (default=%d)\n",
-             options->max_open_files, default_open_files);
+    KernelLogDebug(kernel::Category::LEVELDB, "LevelDB using max_open_files=%d (default=%d)\n",
+                   options->max_open_files, default_open_files);
 }
 
 static leveldb::Options GetOptions(size_t nCacheSize)
@@ -228,12 +228,12 @@ CDBWrapper::CDBWrapper(const DBParams& params)
         DBContext().options.env = DBContext().penv;
     } else {
         if (params.wipe_data) {
-            LogInfo("Wiping LevelDB in %s", fs::PathToString(params.path));
+            KernelLogInfo("Wiping LevelDB in %s", fs::PathToString(params.path));
             leveldb::Status result = leveldb::DestroyDB(fs::PathToString(params.path), DBContext().options);
             HandleError(result);
         }
         TryCreateDirectories(params.path);
-        LogInfo("Opening LevelDB in %s", fs::PathToString(params.path));
+        KernelLogInfo("Opening LevelDB in %s", fs::PathToString(params.path));
     }
     // PathToString() return value is safe to pass to leveldb open function,
     // because on POSIX leveldb passes the byte string directly to ::open(), and
@@ -241,12 +241,12 @@ CDBWrapper::CDBWrapper(const DBParams& params)
     // (see env_posix.cc and env_windows.cc).
     leveldb::Status status = leveldb::DB::Open(DBContext().options, fs::PathToString(params.path), &DBContext().pdb);
     HandleError(status);
-    LogInfo("Opened LevelDB successfully");
+    KernelLogInfo("Opened LevelDB successfully");
 
     if (params.options.force_compact) {
-        LogInfo("Starting database compaction of %s", fs::PathToString(params.path));
+        KernelLogInfo("Starting database compaction of %s", fs::PathToString(params.path));
         DBContext().pdb->CompactRange(nullptr, nullptr);
-        LogInfo("Finished database compaction of %s", fs::PathToString(params.path));
+        KernelLogInfo("Finished database compaction of %s", fs::PathToString(params.path));
     }
 
     if (!Read(OBFUSCATION_KEY, m_obfuscation) && params.obfuscate && IsEmpty()) {
@@ -255,9 +255,9 @@ CDBWrapper::CDBWrapper(const DBParams& params)
         assert(!m_obfuscation); // Make sure the key is written without obfuscation.
         Write(OBFUSCATION_KEY, obfuscation);
         m_obfuscation = obfuscation;
-        LogInfo("Wrote new obfuscation key for %s: %s", fs::PathToString(params.path), m_obfuscation.HexKey());
+        KernelLogInfo("Wrote new obfuscation key for %s: %s", fs::PathToString(params.path), m_obfuscation.HexKey());
     }
-    LogInfo("Using obfuscation key for %s: %s", fs::PathToString(params.path), m_obfuscation.HexKey());
+    KernelLogInfo("Using obfuscation key for %s: %s", fs::PathToString(params.path), m_obfuscation.HexKey());
 }
 
 CDBWrapper::~CDBWrapper()
@@ -276,7 +276,7 @@ CDBWrapper::~CDBWrapper()
 
 bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
 {
-    const bool log_memory = LogAcceptCategory(BCLog::LEVELDB, BCLog::Level::Debug);
+    const bool log_memory = kernel::GetLogger().WillLog(kernel::Level::Debug);
     double mem_before = 0;
     if (log_memory) {
         mem_before = DynamicMemoryUsage() / 1024.0 / 1024;
@@ -285,8 +285,8 @@ bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
     HandleError(status);
     if (log_memory) {
         double mem_after = DynamicMemoryUsage() / 1024.0 / 1024;
-        LogDebug(BCLog::LEVELDB, "WriteBatch memory usage: db=%s, before=%.1fMiB, after=%.1fMiB\n",
-                 m_name, mem_before, mem_after);
+        KernelLogDebug(kernel::Category::LEVELDB, "WriteBatch memory usage: db=%s, before=%.1fMiB, after=%.1fMiB\n",
+                       m_name, mem_before, mem_after);
     }
     return true;
 }
@@ -296,7 +296,7 @@ size_t CDBWrapper::DynamicMemoryUsage() const
     std::string memory;
     std::optional<size_t> parsed;
     if (!DBContext().pdb->GetProperty("leveldb.approximate-memory-usage", &memory) || !(parsed = ToIntegral<size_t>(memory))) {
-        LogDebug(BCLog::LEVELDB, "Failed to get approximate-memory-usage property\n");
+        KernelLogDebug(kernel::Category::LEVELDB, "Failed to get approximate-memory-usage property\n");
         return 0;
     }
     return parsed.value();
@@ -310,7 +310,7 @@ std::optional<std::string> CDBWrapper::ReadImpl(std::span<const std::byte> key) 
     if (!status.ok()) {
         if (status.IsNotFound())
             return std::nullopt;
-        LogPrintf("LevelDB read failure: %s\n", status.ToString());
+        KernelLogInfo("LevelDB read failure: %s\n", status.ToString());
         HandleError(status);
     }
     return strValue;
@@ -325,7 +325,7 @@ bool CDBWrapper::ExistsImpl(std::span<const std::byte> key) const
     if (!status.ok()) {
         if (status.IsNotFound())
             return false;
-        LogPrintf("LevelDB read failure: %s\n", status.ToString());
+        KernelLogInfo("LevelDB read failure: %s\n", status.ToString());
         HandleError(status);
     }
     return true;

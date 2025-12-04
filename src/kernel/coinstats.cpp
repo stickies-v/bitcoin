@@ -8,7 +8,7 @@
 #include <coins.h>
 #include <crypto/muhash.h>
 #include <hash.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <node/blockstorage.h>
 #include <primitives/transaction.h>
 #include <script/script.h>
@@ -134,7 +134,7 @@ static bool ComputeUTXOStats(CCoinsView* view, CCoinsStats& stats, T hash_obj, c
             outputs[key.n] = std::move(coin);
             stats.coins_count++;
         } else {
-            LogError("%s: unable to read value\n", __func__);
+            KernelLogError("%s: unable to read value\n", __func__);
             return false;
         }
         pcursor->Next();

@@ -6,7 +6,7 @@
 #include <script/sigcache.h>
 
 #include <crypto/sha256.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <pubkey.h>
 #include <random.h>
 #include <script/interpreter.h>
@@ -32,8 +32,8 @@ SignatureCache::SignatureCache(const size_t max_size_bytes)
     m_salted_hasher_schnorr.Write(PADDING_SCHNORR, 32);
 
     const auto [num_elems, approx_size_bytes] = setValid.setup_bytes(max_size_bytes);
-    LogInfo("Using %zu MiB out of %zu MiB requested for signature cache, able to store %zu elements",
-              approx_size_bytes >> 20, max_size_bytes >> 20, num_elems);
+    KernelLogInfo("Using %zu MiB out of %zu MiB requested for signature cache, able to store %zu elements",
+                  approx_size_bytes >> 20, max_size_bytes >> 20, num_elems);
 }
 
 void SignatureCache::ComputeEntryECDSA(uint256& entry, const uint256& hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubkey) const

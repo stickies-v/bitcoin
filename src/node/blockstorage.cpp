@@ -13,9 +13,9 @@
 #include <hash.h>
 #include <kernel/blockmanager_opts.h>
 #include <kernel/chainparams.h>
+#include <kernel/log.h>
 #include <kernel/messagestartchars.h>
 #include <kernel/notifications_interface.h>
-#include <logging.h>
 #include <pow.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
@@ -135,13 +135,13 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 pindexNew->nTx            = diskindex.nTx;
 
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams)) {
-                    LogError("%s: CheckProofOfWork failed: %s\n", __func__, pindexNew->ToString());
+                    KernelLogError("%s: CheckProofOfWork failed: %s\n", __func__, pindexNew->ToString());
                     return false;
                 }
 
                 pcursor->Next();
             } else {
-                LogError("%s: failed to read value\n", __func__);
+                KernelLogError("%s: failed to read value\n", __func__);
                 return false;
             }
         } else {
@@ -299,8 +299,8 @@ void BlockManager::FindFilesToPruneManual(
         setFilesToPrune.insert(fileNumber);
         count++;
     }
-    LogInfo("[%s] Prune (Manual): prune_height=%d removed %d blk/rev pairs",
-        chain.GetRole(), last_block_can_prune, count);
+    KernelLogInfo("[%s] Prune (Manual): prune_height=%d removed %d blk/rev pairs",
+                  chain.GetRole(), last_block_can_prune, count);
 }
 
 void BlockManager::FindFilesToPrune(
@@ -371,10 +371,10 @@ void BlockManager::FindFilesToPrune(
         }
     }
 
-    LogDebug(BCLog::PRUNE, "[%s] target=%dMiB actual=%dMiB diff=%dMiB min_height=%d max_prune_height=%d removed %d blk/rev pairs\n",
-             chain.GetRole(), target / 1024 / 1024, nCurrentUsage / 1024 / 1024,
-             (int64_t(target) - int64_t(nCurrentUsage)) / 1024 / 1024,
-             min_block_to_prune, last_block_can_prune, count);
+    KernelLogDebug(kernel::Category::PRUNE, "[%s] target=%dMiB actual=%dMiB diff=%dMiB min_height=%d max_prune_height=%d removed %d blk/rev pairs\n",
+                   chain.GetRole(), target / 1024 / 1024, nCurrentUsage / 1024 / 1024,
+                   (int64_t(target) - int64_t(nCurrentUsage)) / 1024 / 1024,
+                   min_block_to_prune, last_block_can_prune, count);
 }
 
 void BlockManager::UpdatePruneLock(const std::string& name, const PruneLockInfo& lock_info) {
@@ -419,7 +419,7 @@ bool BlockManager::LoadBlockIndex(const std::optional<uint256>& snapshot_blockha
         // to disk, we must bootstrap the value for assumedvalid chainstates
         // from the hardcoded assumeutxo chainparams.
         base->m_chain_tx_count = au_data.m_chain_tx_count;
-        LogInfo("[snapshot] set m_chain_tx_count=%d for %s", au_data.m_chain_tx_count, snapshot_blockhash->ToString());
+        KernelLogInfo("[snapshot] set m_chain_tx_count=%d for %s", au_data.m_chain_tx_count, snapshot_blockhash->ToString());
     } else {
         // If this isn't called with a snapshot blockhash, make sure the cached snapshot height
         // is null. This is relevant during snapshot completion, when the blockman may be loaded
@@ -438,7 +438,7 @@ bool BlockManager::LoadBlockIndex(const std::optional<uint256>& snapshot_blockha
     for (CBlockIndex* pindex : vSortedByHeight) {
         if (m_interrupt) return false;
         if (previous_index && pindex->nHeight > previous_index->nHeight + 1) {
-            LogError("%s: block index is non-contiguous, index of height %d missing\n", __func__, previous_index->nHeight + 1);
+            KernelLogError("%s: block index is non-contiguous, index of height %d missing\n", __func__, previous_index->nHeight + 1);
             return false;
         }
         previous_index = pindex;
@@ -509,11 +509,11 @@ bool BlockManager::LoadBlockIndexDB(const std::optional<uint256>& snapshot_block
     // Load block file info
     m_block_tree_db->ReadLastBlockFile(max_blockfile_num);
     m_blockfile_info.resize(max_blockfile_num + 1);
-    LogInfo("Loading block index db: last block file = %i", max_blockfile_num);
+    KernelLogInfo("Loading block index db: last block file = %i", max_blockfile_num);
     for (int nFile = 0; nFile <= max_blockfile_num; nFile++) {
         m_block_tree_db->ReadBlockFileInfo(nFile, m_blockfile_info[nFile]);
     }
-    LogInfo("Loading block index db: last block file info: %s", m_blockfile_info[max_blockfile_num].ToString());
+    KernelLogInfo("Loading block index db: last block file info: %s", m_blockfile_info[max_blockfile_num].ToString());
     for (int nFile = max_blockfile_num + 1; true; nFile++) {
         CBlockFileInfo info;
         if (m_block_tree_db->ReadBlockFileInfo(nFile, info)) {
@@ -524,7 +524,7 @@ bool BlockManager::LoadBlockIndexDB(const std::optional<uint256>& snapshot_block
     }
 
     // Check presence of blk files
-    LogInfo("Checking all blk files are present...");
+    KernelLogInfo("Checking all blk files are present...");
     std::set<int> setBlkDataFiles;
     for (const auto& [_, block_index] : m_block_index) {
         if (block_index.nStatus & BLOCK_HAVE_DATA) {
@@ -550,7 +550,7 @@ bool BlockManager::LoadBlockIndexDB(const std::optional<uint256>& snapshot_block
     // Check whether we have ever pruned block & undo files
     m_block_tree_db->ReadFlag("prunedblockfiles", m_have_pruned);
     if (m_have_pruned) {
-        LogInfo("Loading block index db: Block files have previously been pruned");
+        KernelLogInfo("Loading block index db: Block files have previously been pruned");
     }
 
     // Check whether we need to continue reindexing
@@ -623,7 +623,7 @@ void BlockManager::CleanupBlockRevFiles() const
     // Glob all blk?????.dat and rev?????.dat files from the blocks directory.
     // Remove the rev files immediately and insert the blk file paths into an
     // ordered map keyed by block file index.
-    LogInfo("Removing unusable blk?????.dat and rev?????.dat files for -reindex with -prune");
+    KernelLogInfo("Removing unusable blk?????.dat and rev?????.dat files for -reindex with -prune");
     for (fs::directory_iterator it(m_opts.blocks_dir); it != fs::directory_iterator(); it++) {
         const std::string path = fs::PathToString(it->path().filename());
         if (fs::is_regular_file(*it) &&
@@ -666,7 +666,7 @@ bool BlockManager::ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex& index
     // Open history file to read
     AutoFile file{OpenUndoFile(pos, true)};
     if (file.IsNull()) {
-        LogError("OpenUndoFile failed for %s while reading block undo", pos.ToString());
+        KernelLogError("OpenUndoFile failed for %s while reading block undo", pos.ToString());
         return false;
     }
     BufferedReader filein{std::move(file)};
@@ -683,11 +683,11 @@ bool BlockManager::ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex& index
 
         // Verify checksum
         if (hashChecksum != verifier.GetHash()) {
-            LogError("Checksum mismatch at %s while reading block undo", pos.ToString());
+            KernelLogError("Checksum mismatch at %s while reading block undo", pos.ToString());
             return false;
         }
     } catch (const std::exception& e) {
-        LogError("Deserialize or I/O error - %s at %s while reading block undo", e.what(), pos.ToString());
+        KernelLogError("Deserialize or I/O error - %s at %s while reading block undo", e.what(), pos.ToString());
         return false;
     }
 
@@ -774,7 +774,7 @@ void BlockManager::UnlinkPrunedFiles(const std::set<int>& setFilesToPrune) const
         const bool removed_blockfile{fs::remove(m_block_file_seq.FileName(pos), ec)};
         const bool removed_undofile{fs::remove(m_undo_file_seq.FileName(pos), ec)};
         if (removed_blockfile || removed_undofile) {
-            LogDebug(BCLog::BLOCKSTORAGE, "Prune: %s deleted blk/rev (%05u)\n", __func__, *it);
+            KernelLogDebug(kernel::Category::BLOCKSTORAGE, "Prune: %s deleted blk/rev (%05u)\n", __func__, *it);
         }
     }
 }
@@ -806,7 +806,7 @@ FlatFilePos BlockManager::FindNextBlockPos(unsigned int nAddSize, unsigned int n
         assert(chain_type == BlockfileType::ASSUMED);
         const auto new_cursor = BlockfileCursor{this->MaxBlockfileNum() + 1};
         m_blockfile_cursors[chain_type] = new_cursor;
-        LogDebug(BCLog::BLOCKSTORAGE, "[%s] initializing blockfile cursor to %s\n", chain_type, new_cursor);
+        KernelLogDebug(kernel::Category::BLOCKSTORAGE, "[%s] initializing blockfile cursor to %s\n", chain_type, new_cursor);
     }
     const int last_blockfile = m_blockfile_cursors[chain_type]->file_num;
 
@@ -849,8 +849,8 @@ FlatFilePos BlockManager::FindNextBlockPos(unsigned int nAddSize, unsigned int n
     pos.nPos = m_blockfile_info[nFile].nSize;
 
     if (nFile != last_blockfile) {
-        LogDebug(BCLog::BLOCKSTORAGE, "Leaving block file %i: %s (onto %i) (height %i)\n",
-                 last_blockfile, m_blockfile_info[last_blockfile].ToString(), nFile, nHeight);
+        KernelLogDebug(kernel::Category::BLOCKSTORAGE, "Leaving block file %i: %s (onto %i) (height %i)\n",
+                       last_blockfile, m_blockfile_info[last_blockfile].ToString(), nFile, nHeight);
 
         // Do not propagate the return code. The flush concerns a previous block
         // and undo file that has already been written to. If a flush fails
@@ -860,9 +860,10 @@ FlatFilePos BlockManager::FindNextBlockPos(unsigned int nAddSize, unsigned int n
         // a reindex. A flush error might also leave some of the data files
         // untrimmed.
         if (!FlushBlockFile(last_blockfile, /*fFinalize=*/true, finalize_undo)) {
-            LogPrintLevel(BCLog::BLOCKSTORAGE, BCLog::Level::Warning,
-                          "Failed to flush previous block file %05i (finalize=1, finalize_undo=%i) before opening new block file %05i\n",
-                          last_blockfile, finalize_undo, nFile);
+            KernelLogWarning(
+                "Failed to flush previous block file %05i (finalize=1, finalize_undo=%i) before "
+                "opening new block file %05i\n",
+                last_blockfile, finalize_undo, nFile);
         }
         // No undo data yet in the new file, so reset our undo-height tracking.
         m_blockfile_cursors[chain_type] = BlockfileCursor{nFile};
@@ -940,14 +941,14 @@ bool BlockManager::WriteBlockUndo(const CBlockUndo& blockundo, BlockValidationSt
         FlatFilePos pos;
         const auto blockundo_size{static_cast<uint32_t>(GetSerializeSize(blockundo))};
         if (!FindUndoPos(state, block.nFile, pos, blockundo_size + UNDO_DATA_DISK_OVERHEAD)) {
-            LogError("FindUndoPos failed for %s while writing block undo", pos.ToString());
+            KernelLogError("FindUndoPos failed for %s while writing block undo", pos.ToString());
             return false;
         }
 
         // Open history file to append
         AutoFile file{OpenUndoFile(pos)};
         if (file.IsNull()) {
-            LogError("OpenUndoFile failed for %s while writing block undo", pos.ToString());
+            KernelLogError("OpenUndoFile failed for %s while writing block undo", pos.ToString());
             return FatalError(m_opts.notifications, state, _("Failed to write undo data."));
         }
         {
@@ -968,7 +969,7 @@ bool BlockManager::WriteBlockUndo(const CBlockUndo& blockundo, BlockValidationSt
 
         // Make sure that the file is closed before we call `FlushUndoFile`.
         if (file.fclose() != 0) {
-            LogError("Failed to close block undo file %s: %s", pos.ToString(), SysErrorString(errno));
+            KernelLogError("Failed to close block undo file %s: %s", pos.ToString(), SysErrorString(errno));
             return FatalError(m_opts.notifications, state, _("Failed to close block undo file."));
         }
 
@@ -984,7 +985,7 @@ bool BlockManager::WriteBlockUndo(const CBlockUndo& blockundo, BlockValidationSt
             // fact it is. Note though, that a failed flush might leave the data
             // file untrimmed.
             if (!FlushUndoFile(pos.nFile, true)) {
-                LogPrintLevel(BCLog::BLOCKSTORAGE, BCLog::Level::Warning, "Failed to flush undo file %05i\n", pos.nFile);
+                KernelLogWarning("Failed to flush undo file %05i\n", pos.nFile);
             }
         } else if (pos.nFile == cursor.file_num && block.nHeight > cursor.undo_height) {
             cursor.undo_height = block.nHeight;
@@ -1012,7 +1013,7 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
         // Read block
         SpanReader{block_data} >> TX_WITH_WITNESS(block);
     } catch (const std::exception& e) {
-        LogError("Deserialize or I/O error - %s at %s while reading block", e.what(), pos.ToString());
+        KernelLogError("Deserialize or I/O error - %s at %s while reading block", e.what(), pos.ToString());
         return false;
     }
 
@@ -1020,19 +1021,19 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
 
     // Check the header
     if (!CheckProofOfWork(block_hash, block.nBits, GetConsensus())) {
-        LogError("Errors in block header at %s while reading block", pos.ToString());
+        KernelLogError("Errors in block header at %s while reading block", pos.ToString());
         return false;
     }
 
     // Signet only: check block solution
     if (GetConsensus().signet_blocks && !CheckSignetBlockSolution(block, GetConsensus())) {
-        LogError("Errors in block solution at %s while reading block", pos.ToString());
+        KernelLogError("Errors in block solution at %s while reading block", pos.ToString());
         return false;
     }
 
     if (expected_hash && block_hash != *expected_hash) {
-        LogError("GetHash() doesn't match index at %s while reading block (%s != %s)",
-                 pos.ToString(), block_hash.ToString(), expected_hash->ToString());
+        KernelLogError("GetHash() doesn't match index at %s while reading block (%s != %s)",
+                       pos.ToString(), block_hash.ToString(), expected_hash->ToString());
         return false;
     }
 
@@ -1051,12 +1052,12 @@ bool BlockManager::ReadRawBlock(std::vector<std::byte>& block, const FlatFilePos
         // If nPos is less than STORAGE_HEADER_BYTES, we can't read the header that precedes the block data
         // This would cause an unsigned integer underflow when trying to position the file cursor
         // This can happen after pruning or default constructed positions
-        LogError("Failed for %s while reading raw block storage header", pos.ToString());
+        KernelLogError("Failed for %s while reading raw block storage header", pos.ToString());
         return false;
     }
     AutoFile filein{OpenBlockFile({pos.nFile, pos.nPos - STORAGE_HEADER_BYTES}, /*fReadOnly=*/true)};
     if (filein.IsNull()) {
-        LogError("OpenBlockFile failed for %s while reading raw block", pos.ToString());
+        KernelLogError("OpenBlockFile failed for %s while reading raw block", pos.ToString());
         return false;
     }
 
@@ -1067,21 +1068,21 @@ bool BlockManager::ReadRawBlock(std::vector<std::byte>& block, const FlatFilePos
         filein >> blk_start >> blk_size;
 
         if (blk_start != GetParams().MessageStart()) {
-            LogError("Block magic mismatch for %s: %s versus expected %s while reading raw block",
-                pos.ToString(), HexStr(blk_start), HexStr(GetParams().MessageStart()));
+            KernelLogError("Block magic mismatch for %s: %s versus expected %s while reading raw block",
+                           pos.ToString(), HexStr(blk_start), HexStr(GetParams().MessageStart()));
             return false;
         }
 
         if (blk_size > MAX_SIZE) {
-            LogError("Block data is larger than maximum deserialization size for %s: %s versus %s while reading raw block",
-                pos.ToString(), blk_size, MAX_SIZE);
+            KernelLogError("Block data is larger than maximum deserialization size for %s: %s versus %s while reading raw block",
+                           pos.ToString(), blk_size, MAX_SIZE);
             return false;
         }
 
         block.resize(blk_size); // Zeroing of memory is intentional here
         filein.read(block);
     } catch (const std::exception& e) {
-        LogError("Read from block file failed: %s for %s while reading raw block", e.what(), pos.ToString());
+        KernelLogError("Read from block file failed: %s for %s while reading raw block", e.what(), pos.ToString());
         return false;
     }
 
@@ -1093,12 +1094,12 @@ FlatFilePos BlockManager::WriteBlock(const CBlock& block, int nHeight)
     const unsigned int block_size{static_cast<unsigned int>(GetSerializeSize(TX_WITH_WITNESS(block)))};
     FlatFilePos pos{FindNextBlockPos(block_size + STORAGE_HEADER_BYTES, nHeight, block.GetBlockTime())};
     if (pos.IsNull()) {
-        LogError("FindNextBlockPos failed for %s while writing block", pos.ToString());
+        KernelLogError("FindNextBlockPos failed for %s while writing block", pos.ToString());
         return FlatFilePos();
     }
     AutoFile file{OpenBlockFile(pos, /*fReadOnly=*/false)};
     if (file.IsNull()) {
-        LogError("OpenBlockFile failed for %s while writing block", pos.ToString());
+        KernelLogError("OpenBlockFile failed for %s while writing block", pos.ToString());
         m_opts.notifications.fatalError(_("Failed to write block."));
         return FlatFilePos();
     }
@@ -1113,7 +1114,7 @@ FlatFilePos BlockManager::WriteBlock(const CBlock& block, int nHeight)
     }
 
     if (file.fclose() != 0) {
-        LogError("Failed to close block file %s: %s", pos.ToString(), SysErrorString(errno));
+        KernelLogError("Failed to close block file %s: %s", pos.ToString(), SysErrorString(errno));
         m_opts.notifications.fatalError(_("Failed to close file when writing block."));
         return FlatFilePos();
     }
@@ -1174,7 +1175,7 @@ static auto InitBlocksdirXorKey(const BlockManager::Options& opts)
                       HexStr(obfuscation), fs::PathToString(xor_key_path)),
         };
     }
-    LogInfo("Using obfuscation key for blocksdir *.dat files (%s): '%s'\n", fs::PathToString(opts.blocks_dir), HexStr(obfuscation));
+    KernelLogInfo("Using obfuscation key for blocksdir *.dat files (%s): '%s'\n", fs::PathToString(opts.blocks_dir), HexStr(obfuscation));
     return Obfuscation{obfuscation};
 }
 
@@ -1234,17 +1235,17 @@ void ImportBlocks(ChainstateManager& chainman, std::span<const fs::path> import_
             if (file.IsNull()) {
                 break; // This error is logged in OpenBlockFile
             }
-            LogInfo("Reindexing block file blk%05u.dat...", (unsigned int)nFile);
+            KernelLogInfo("Reindexing block file blk%05u.dat...", (unsigned int)nFile);
             chainman.LoadExternalBlockFile(file, &pos, &blocks_with_unknown_parent);
             if (chainman.m_interrupt) {
-                LogInfo("Interrupt requested. Exit reindexing.");
+                KernelLogInfo("Interrupt requested. Exit reindexing.");
                 return;
             }
             nFile++;
         }
         WITH_LOCK(::cs_main, chainman.m_blockman.m_block_tree_db->WriteReindexing(false));
         chainman.m_blockman.m_blockfiles_indexed = true;
-        LogInfo("Reindexing finished");
+        KernelLogInfo("Reindexing finished");
         // To avoid ending up in a situation without genesis block, re-try initializing (no-op if reindexing worked):
         chainman.ActiveChainstate().LoadGenesisBlock();
     }
@@ -1253,14 +1254,14 @@ void ImportBlocks(ChainstateManager& chainman, std::span<const fs::path> import_
     for (const fs::path& path : import_paths) {
         AutoFile file{fsbridge::fopen(path, "rb")};
         if (!file.IsNull()) {
-            LogInfo("Importing blocks file %s...", fs::PathToString(path));
+            KernelLogInfo("Importing blocks file %s...", fs::PathToString(path));
             chainman.LoadExternalBlockFile(file);
             if (chainman.m_interrupt) {
-                LogInfo("Interrupt requested. Exit block importing.");
+                KernelLogInfo("Interrupt requested. Exit block importing.");
                 return;
             }
         } else {
-            LogPrintf("Warning: Could not open blocks file %s\n", fs::PathToString(path));
+            KernelLogInfo("Warning: Could not open blocks file %s\n", fs::PathToString(path));
         }
     }
 

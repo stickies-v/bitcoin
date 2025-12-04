@@ -10,8 +10,8 @@
 #include <consensus/merkle.h>
 #include <consensus/params.h>
 #include <hash.h>
+#include <kernel/log.h>
 #include <kernel/messagestartchars.h>
-#include <logging.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
@@ -452,7 +452,7 @@ public:
                 0,
                 0,
             };
-            LogInfo("Signet with challenge %s", HexStr(bin));
+            KernelLogInfo("Signet with challenge %s", HexStr(bin));
         }
 
         if (options.seeds) {

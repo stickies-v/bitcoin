@@ -4,7 +4,7 @@
 
 #include <node/utxo_snapshot.h>
 
-#include <logging.h>
+#include <kernel/log.h>
 #include <streams.h>
 #include <sync.h>
 #include <tinyformat.h>
@@ -32,15 +32,15 @@ bool WriteSnapshotBaseBlockhash(Chainstate& snapshot_chainstate)
     FILE* file{fsbridge::fopen(write_to, "wb")};
     AutoFile afile{file};
     if (afile.IsNull()) {
-        LogPrintf("[snapshot] failed to open base blockhash file for writing: %s\n",
-                  fs::PathToString(write_to));
+        KernelLogInfo("[snapshot] failed to open base blockhash file for writing: %s\n",
+                      fs::PathToString(write_to));
         return false;
     }
     afile << *snapshot_chainstate.m_from_snapshot_blockhash;
 
     if (afile.fclose() != 0) {
-        LogPrintf("[snapshot] failed to close base blockhash file %s after writing\n",
-                  fs::PathToString(write_to));
+        KernelLogInfo("[snapshot] failed to close base blockhash file %s after writing\n",
+                      fs::PathToString(write_to));
         return false;
     }
     return true;
@@ -49,17 +49,18 @@ bool WriteSnapshotBaseBlockhash(Chainstate& snapshot_chainstate)
 std::optional<uint256> ReadSnapshotBaseBlockhash(fs::path chaindir)
 {
     if (!fs::exists(chaindir)) {
-        LogPrintf("[snapshot] cannot read base blockhash: no chainstate dir "
-            "exists at path %s\n", fs::PathToString(chaindir));
+        KernelLogInfo("[snapshot] cannot read base blockhash: no chainstate dir "
+                      "exists at path %s\n",
+                      fs::PathToString(chaindir));
         return std::nullopt;
     }
     const fs::path read_from = chaindir / node::SNAPSHOT_BLOCKHASH_FILENAME;
     const std::string read_from_str = fs::PathToString(read_from);
 
     if (!fs::exists(read_from)) {
-        LogPrintf("[snapshot] snapshot chainstate dir is malformed! no base blockhash file "
-            "exists at path %s. Try deleting %s and calling loadtxoutset again?\n",
-            fs::PathToString(chaindir), read_from_str);
+        KernelLogInfo("[snapshot] snapshot chainstate dir is malformed! no base blockhash file "
+                      "exists at path %s. Try deleting %s and calling loadtxoutset again?\n",
+                      fs::PathToString(chaindir), read_from_str);
         return std::nullopt;
     }
 
@@ -67,8 +68,8 @@ std::optional<uint256> ReadSnapshotBaseBlockhash(fs::path chaindir)
     FILE* file{fsbridge::fopen(read_from, "rb")};
     AutoFile afile{file};
     if (afile.IsNull()) {
-        LogPrintf("[snapshot] failed to open base blockhash file for reading: %s\n",
-            read_from_str);
+        KernelLogInfo("[snapshot] failed to open base blockhash file for reading: %s\n",
+                      read_from_str);
         return std::nullopt;
     }
     afile >> base_blockhash;
@@ -76,7 +77,7 @@ std::optional<uint256> ReadSnapshotBaseBlockhash(fs::path chaindir)
     int64_t position = afile.tell();
     afile.seek(0, SEEK_END);
     if (position != afile.tell()) {
-        LogPrintf("[snapshot] warning: unexpected trailing data in %s\n", read_from_str);
+        KernelLogWarning("[snapshot] warning: unexpected trailing data in %s\n", read_from_str);
     }
     return base_blockhash;
 }

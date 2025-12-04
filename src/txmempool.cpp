@@ -11,7 +11,7 @@
 #include <consensus/consensus.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
-#include <logging.h>
+#include <kernel/log.h>
 #include <policy/policy.h>
 #include <policy/settings.h>
 #include <random.h>
@@ -280,8 +280,9 @@ CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(
 {
     auto result{CalculateMemPoolAncestors(entry, limits, fSearchForParents)};
     if (!Assume(result)) {
-        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error, "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)\n",
-                      calling_fn_name, util::ErrorString(result).original);
+        KernelLogError(
+            "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)",
+            calling_fn_name, util::ErrorString(result).original);
     }
     return std::move(result).value_or(CTxMemPool::setEntries{});
 }
@@ -697,7 +698,7 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
 
     AssertLockHeld(::cs_main);
     LOCK(cs);
-    LogDebug(BCLog::MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
+    KernelLogDebug(kernel::Category::MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
     CAmount check_total_fee{0};
@@ -910,13 +911,13 @@ void CTxMemPool::PrioritiseTransaction(const Txid& hash, const CAmount& nFeeDelt
         }
         if (delta == 0) {
             mapDeltas.erase(hash);
-            LogPrintf("PrioritiseTransaction: %s (%sin mempool) delta cleared\n", hash.ToString(), it == mapTx.end() ? "not " : "");
+            KernelLogInfo("PrioritiseTransaction: %s (%sin mempool) delta cleared\n", hash.ToString(), it == mapTx.end() ? "not " : "");
         } else {
-            LogPrintf("PrioritiseTransaction: %s (%sin mempool) fee += %s, new delta=%s\n",
-                      hash.ToString(),
-                      it == mapTx.end() ? "not " : "",
-                      FormatMoney(nFeeDelta),
-                      FormatMoney(delta));
+            KernelLogInfo("PrioritiseTransaction: %s (%sin mempool) fee += %s, new delta=%s\n",
+                          hash.ToString(),
+                          it == mapTx.end() ? "not " : "",
+                          FormatMoney(nFeeDelta),
+                          FormatMoney(delta));
         }
     }
 }
@@ -1053,7 +1054,7 @@ void CTxMemPool::RemoveUnbroadcastTx(const Txid& txid, const bool unchecked) {
 
     if (m_unbroadcast_txids.erase(txid))
     {
-        LogDebug(BCLog::MEMPOOL, "Removed %i from set of unbroadcast txns%s\n", txid.GetHex(), (unchecked ? " before confirmation that txn was sent out" : ""));
+        KernelLogDebug(kernel::Category::MEMPOOL, "Removed %i from set of unbroadcast txns%s\n", txid.GetHex(), (unchecked ? " before confirmation that txn was sent out" : ""));
     }
 }
 
@@ -1177,7 +1178,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
     }
 
     if (maxFeeRateRemoved > CFeeRate(0)) {
-        LogDebug(BCLog::MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
+        KernelLogDebug(kernel::Category::MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
     }
 }
 

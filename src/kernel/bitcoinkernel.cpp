@@ -15,9 +15,9 @@
 #include <kernel/checks.h>
 #include <kernel/context.h>
 #include <kernel/cs_main.h>
+#include <kernel/log.h>
 #include <kernel/notifications_interface.h>
 #include <kernel/warning.h>
-#include <logging.h>
 #include <node/blockstorage.h>
 #include <node/chainstate.h>
 #include <primitives/block.h>
@@ -238,7 +238,7 @@ struct LoggingConnection {
 
         // Only start logging if we just added the connection.
         if (LogInstance().NumConnections() == 1 && !LogInstance().StartLogging()) {
-            LogError("Logger start failed.");
+            KernelLogError("Logger start failed.");
             LogInstance().DeleteCallback(connection);
             if (user_data && user_data_destroy_callback) {
                 user_data_destroy_callback(user_data);
@@ -250,13 +250,13 @@ struct LoggingConnection {
         m_user_data = user_data;
         m_deleter = user_data_destroy_callback;
 
-        LogDebug(BCLog::KERNEL, "Logger connected.");
+        KernelLogDebug(kernel::Category::KERNEL, "Logger connected.");
     }
 
     ~LoggingConnection()
     {
         LOCK(cs_main);
-        LogDebug(BCLog::KERNEL, "Logger disconnecting.");
+        KernelLogDebug(kernel::Category::KERNEL, "Logger disconnecting.");
 
         // Switch back to buffering by calling DisconnectTestLogger if the
         // connection that we are about to remove is the last one.
@@ -823,7 +823,7 @@ btck_Context* btck_context_create(const btck_ContextOptions* options)
     const ContextOptions* opts = options ? &btck_ContextOptions::get(options) : nullptr;
     auto context{std::make_shared<const Context>(opts, sane)};
     if (!sane) {
-        LogError("Kernel context sanity check failed.");
+        KernelLogError("Kernel context sanity check failed.");
         return nullptr;
     }
     return btck_Context::create(context);
@@ -847,7 +847,7 @@ void btck_context_destroy(btck_Context* context)
 const btck_BlockTreeEntry* btck_block_tree_entry_get_previous(const btck_BlockTreeEntry* entry)
 {
     if (!btck_BlockTreeEntry::get(entry).pprev) {
-        LogInfo("Genesis block has no previous.");
+        KernelLogInfo("Genesis block has no previous.");
         return nullptr;
     }
 
@@ -897,7 +897,7 @@ btck_ChainstateManagerOptions* btck_chainstate_manager_options_create(const btck
         fs::create_directories(abs_blocks_dir);
         return btck_ChainstateManagerOptions::create(btck_Context::get(context), abs_data_dir, abs_blocks_dir);
     } catch (const std::exception& e) {
-        LogError("Failed to create chainstate manager options: %s", e.what());
+        KernelLogError("Failed to create chainstate manager options: %s", e.what());
         return nullptr;
     }
 }
@@ -916,7 +916,7 @@ void btck_chainstate_manager_options_destroy(btck_ChainstateManagerOptions* opti
 int btck_chainstate_manager_options_set_wipe_dbs(btck_ChainstateManagerOptions* chainman_opts, int wipe_block_tree_db, int wipe_chainstate_db)
 {
     if (wipe_block_tree_db == 1 && wipe_chainstate_db != 1) {
-        LogError("Wiping the block tree db without also wiping the chainstate db is currently unsupported.");
+        KernelLogError("Wiping the block tree db without also wiping the chainstate db is currently unsupported.");
         return -1;
     }
     auto& opts{btck_ChainstateManagerOptions::get(chainman_opts)};
@@ -953,7 +953,7 @@ btck_ChainstateManager* btck_chainstate_manager_create(
         LOCK(opts.m_mutex);
         chainman = std::make_unique<ChainstateManager>(*opts.m_context->m_interrupt, opts.m_chainman_options, opts.m_blockman_options);
     } catch (const std::exception& e) {
-        LogError("Failed to create chainstate manager: %s", e.what());
+        KernelLogError("Failed to create chainstate manager: %s", e.what());
         return nullptr;
     }
 
@@ -963,24 +963,24 @@ btck_ChainstateManager* btck_chainstate_manager_create(
         kernel::CacheSizes cache_sizes{DEFAULT_KERNEL_CACHE};
         auto [status, chainstate_err]{node::LoadChainstate(*chainman, cache_sizes, chainstate_load_opts)};
         if (status != node::ChainstateLoadStatus::SUCCESS) {
-            LogError("Failed to load chain state from your data directory: %s", chainstate_err.original);
+            KernelLogError("Failed to load chain state from your data directory: %s", chainstate_err.original);
             return nullptr;
         }
         std::tie(status, chainstate_err) = node::VerifyLoadedChainstate(*chainman, chainstate_load_opts);
         if (status != node::ChainstateLoadStatus::SUCCESS) {
-            LogError("Failed to verify loaded chain state from your datadir: %s", chainstate_err.original);
+            KernelLogError("Failed to verify loaded chain state from your datadir: %s", chainstate_err.original);
             return nullptr;
         }
 
         for (Chainstate* chainstate : WITH_LOCK(chainman->GetMutex(), return chainman->GetAll())) {
             BlockValidationState state;
             if (!chainstate->ActivateBestChain(state, nullptr)) {
-                LogError("Failed to connect best block: %s", state.ToString());
+                KernelLogError("Failed to connect best block: %s", state.ToString());
                 return nullptr;
             }
         }
     } catch (const std::exception& e) {
-        LogError("Failed to load chainstate: %s", e.what());
+        KernelLogError("Failed to load chainstate: %s", e.what());
         return nullptr;
     }
 
@@ -992,7 +992,7 @@ const btck_BlockTreeEntry* btck_chainstate_manager_get_block_tree_entry_by_hash(
     auto block_index = WITH_LOCK(btck_ChainstateManager::get(chainman).m_chainman->GetMutex(),
                                  return btck_ChainstateManager::get(chainman).m_chainman->m_blockman.LookupBlockIndex(btck_BlockHash::get(block_hash)));
     if (!block_index) {
-        LogDebug(BCLog::KERNEL, "A block with the given hash is not indexed.");
+        KernelLogDebug(kernel::Category::KERNEL, "A block with the given hash is not indexed.");
         return nullptr;
     }
     return btck_BlockTreeEntry::ref(block_index);
@@ -1025,7 +1025,7 @@ int btck_chainstate_manager_import_blocks(btck_ChainstateManager* chainman, cons
         }
         node::ImportBlocks(*btck_ChainstateManager::get(chainman).m_chainman, import_files);
     } catch (const std::exception& e) {
-        LogError("Failed to import blocks: %s", e.what());
+        KernelLogError("Failed to import blocks: %s", e.what());
         return -1;
     }
     return 0;
@@ -1040,7 +1040,7 @@ btck_Block* btck_block_create(const void* raw_block, size_t raw_block_length)
     try {
         stream >> TX_WITH_WITNESS(*block);
     } catch (...) {
-        LogDebug(BCLog::KERNEL, "Block decode failed.");
+        KernelLogDebug(kernel::Category::KERNEL, "Block decode failed.");
         return nullptr;
     }
 
@@ -1088,7 +1088,7 @@ btck_Block* btck_block_read(const btck_ChainstateManager* chainman, const btck_B
 {
     auto block{std::make_shared<CBlock>()};
     if (!btck_ChainstateManager::get(chainman).m_chainman->m_blockman.ReadBlock(*block, btck_BlockTreeEntry::get(entry))) {
-        LogError("Failed to read block.");
+        KernelLogError("Failed to read block.");
         return nullptr;
     }
     return btck_Block::create(block);
@@ -1133,11 +1133,11 @@ btck_BlockSpentOutputs* btck_block_spent_outputs_read(const btck_ChainstateManag
 {
     auto block_undo{std::make_shared<CBlockUndo>()};
     if (btck_BlockTreeEntry::get(entry).nHeight < 1) {
-        LogDebug(BCLog::KERNEL, "The genesis block does not have any spent outputs.");
+        KernelLogDebug(kernel::Category::KERNEL, "The genesis block does not have any spent outputs.");
         return btck_BlockSpentOutputs::create(block_undo);
     }
     if (!btck_ChainstateManager::get(chainman).m_chainman->m_blockman.ReadBlockUndo(*block_undo, btck_BlockTreeEntry::get(entry))) {
-        LogError("Failed to read block spent outputs data.");
+        KernelLogError("Failed to read block spent outputs data.");
         return nullptr;
     }
     return btck_BlockSpentOutputs::create(block_undo);
