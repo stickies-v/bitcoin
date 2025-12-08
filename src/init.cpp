@@ -1130,12 +1130,15 @@ bool AppInitParameterInteraction(const ArgsManager& args)
 static bool LockDirectory(const fs::path& dir, bool probeOnly)
 {
     // Make sure only a single process is using the directory.
-    switch (util::LockDirectory(dir, ".lock", probeOnly)) {
+    const auto& res{util::LockDirectory(dir, ".lock", probeOnly)};
+    if (res) return true;
+
+    switch (res.error().result) {
     case util::LockResult::ErrorWrite:
         return InitError(strprintf(_("Cannot write to directory '%s'; check permissions."), fs::PathToString(dir)));
     case util::LockResult::ErrorLock:
+        LogError("Error while attempting to lock directory %s: %s\n", fs::PathToString(dir), res.error().reason);
         return InitError(strprintf(_("Cannot obtain a lock on directory %s. %s is probably already running."), fs::PathToString(dir), CLIENT_NAME));
-    case util::LockResult::Success: return true;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }

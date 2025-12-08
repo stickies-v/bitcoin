@@ -968,8 +968,9 @@ enum : char {
         switch (ch) {
         case LockCommand:
             ch = [&] {
-                switch (util::LockDirectory(dirname, lockname)) {
-                case util::LockResult::Success: return ResSuccess;
+                const auto& res{util::LockDirectory(dirname, lockname)};
+                if (res) return ResSuccess;
+                switch (res.error().result) {
                 case util::LockResult::ErrorWrite: return ResErrorWrite;
                 case util::LockResult::ErrorLock: return ResErrorLock;
                 } // no default case, so the compiler can warn about missing cases
@@ -1018,24 +1019,28 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     BOOST_CHECK_EQUAL(ch, ResErrorWrite);
 #endif
     // Lock on non-existent directory should fail
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname), util::LockResult::ErrorWrite);
+    {
+        const auto& res{util::LockDirectory(dirname, lockname)};
+        BOOST_REQUIRE(!res);
+        BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname).error().result, util::LockResult::ErrorWrite);
+    }
 
     fs::create_directories(dirname);
 
     // Probing lock on new directory should succeed
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname, true), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname, true));
 
     // Persistent lock on new directory should succeed
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname));
 
     // Another lock on the directory from the same thread should succeed
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname));
 
     // Another lock on the directory from a different thread within the same process should succeed
-    util::LockResult threadresult;
+    util::Expected<void, util::LockError> threadresult;
     std::thread thr([&] { threadresult = util::LockDirectory(dirname, lockname); });
     thr.join();
-    BOOST_CHECK_EQUAL(threadresult, util::LockResult::Success);
+    BOOST_CHECK(threadresult);
 #ifndef WIN32
     // Try to acquire lock in child process while we're holding it, this should fail.
     BOOST_CHECK_EQUAL(write(fd[1], &LockCommand, 1), 1);
@@ -1045,7 +1050,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     // Give up our lock
     ReleaseDirectoryLocks();
     // Probing lock from our side now should succeed, but not hold on to the lock.
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname, true), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname, true));
 
     // Try to acquire the lock in the child process, this should be successful.
     BOOST_CHECK_EQUAL(write(fd[1], &LockCommand, 1), 1);
@@ -1053,7 +1058,11 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     BOOST_CHECK_EQUAL(ch, ResSuccess);
 
     // When we try to probe the lock now, it should fail.
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname, true), util::LockResult::ErrorLock);
+    {
+        const auto& res{util::LockDirectory(dirname, lockname, true)};
+        BOOST_REQUIRE(!res);
+        BOOST_CHECK_EQUAL(res.error().result, util::LockResult::ErrorLock);
+    }
 
     // Unlock the lock in the child process
     BOOST_CHECK_EQUAL(write(fd[1], &UnlockCommand, 1), 1);
@@ -1061,7 +1070,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     BOOST_CHECK_EQUAL(ch, ResUnlockSuccess);
 
     // When we try to probe the lock now, it should succeed.
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname, true), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname, true));
 
     // Re-lock the lock in the child process, then wait for it to exit, check
     // successful return. After that, we check that exiting the process
@@ -1074,7 +1083,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     BOOST_CHECK_EQUAL(write(fd[1], &ExitCommand, 1), 1);
     BOOST_CHECK_EQUAL(waitpid(pid, &processstatus, 0), pid);
     BOOST_CHECK_EQUAL(processstatus, 0);
-    BOOST_CHECK_EQUAL(util::LockDirectory(dirname, lockname, true), util::LockResult::Success);
+    BOOST_CHECK(util::LockDirectory(dirname, lockname, true));
 
     BOOST_CHECK_EQUAL(close(fd[1]), 0); // Close our side of the socketpair
 #endif

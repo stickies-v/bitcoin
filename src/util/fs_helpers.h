@@ -6,6 +6,7 @@
 #ifndef BITCOIN_UTIL_FS_HELPERS_H
 #define BITCOIN_UTIL_FS_HELPERS_H
 
+#include <util/expected.h>
 #include <util/fs.h>
 
 #include <cstdint>
@@ -55,11 +56,18 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length);
 
 namespace util {
 enum class LockResult {
-    Success,
     ErrorWrite,
     ErrorLock,
 };
-[[nodiscard]] LockResult LockDirectory(const fs::path& directory, const fs::path& lockfile_name, bool probe_only = false);
+
+struct LockError {
+    LockResult result;
+    std::string reason;
+};
+[[nodiscard]] util::Expected<void, LockError> LockDirectory(
+    const fs::path& directory,
+    const fs::path& lockfile_name,
+    bool probe_only = false);
 } // namespace util
 void UnlockDirectory(const fs::path& directory, const fs::path& lockfile_name);
 bool CheckDiskSpace(const fs::path& dir, uint64_t additional_bytes = 0);

@@ -176,7 +176,7 @@ BasicTestingSetup::BasicTestingSetup(const ChainType chainType, TestOpts opts)
 
         // Try to obtain the lock; if unsuccessful don't disturb the existing test.
         TryCreateDirectories(m_path_lock);
-        if (util::LockDirectory(m_path_lock, ".lock", /*probe_only=*/false) != util::LockResult::Success) {
+        if (const auto& res{util::LockDirectory(m_path_lock, ".lock", /*probe_only=*/false)}; !res) {
             ExitFailure("Cannot obtain a lock on test data lock directory " + fs::PathToString(m_path_lock) + '\n' + "The test executable is probably already running.");
         }
 
