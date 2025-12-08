@@ -1959,7 +1959,9 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     }
 
     node.background_init_thread = std::thread(&util::TraceThread, "initload", [=, &chainman, &args, &node] {
-        ScheduleBatchPriority();
+        if (const auto& res{ScheduleBatchPriority()}; !res) {
+            LogWarning("ScheduleBatchPriority failed: %s", res.error());
+        }
         // Import blocks and ActivateBestChain()
         ImportBlocks(chainman, vImportFiles);
         if (args.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
