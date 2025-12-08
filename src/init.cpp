@@ -1433,9 +1433,10 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     scheduler.m_service_thread = std::thread(common::TraceThread, "scheduler", [&] { scheduler.serviceQueue(); });
 
     // Gather some entropy once per minute.
-    scheduler.scheduleEvery([]{
-        RandAddPeriodic();
-    }, std::chrono::minutes{1});
+    scheduler.scheduleEvery([] {
+        LogDebug(BCLog::RAND, "Feeding %d bytes of environment data into RNG\n", RandAddPeriodic());
+    },
+                            std::chrono::minutes{1});
 
     // Check disk space every 5 minutes to avoid db corruption.
     scheduler.scheduleEvery([&args, &node]{

@@ -91,8 +91,10 @@ std::optional<HardwareRngInfo> RandomInit();
  * Gather entropy from various expensive sources, and feed them to the PRNG state.
  *
  * Thread-safe.
+ *
+ * @return The number of environment bytes fed into the RNG.
  */
-void RandAddPeriodic() noexcept;
+size_t RandAddPeriodic() noexcept;
 
 /**
  * Gathers entropy from the low bits of the time at which events occur. Should

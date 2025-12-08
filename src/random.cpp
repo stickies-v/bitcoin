@@ -12,7 +12,6 @@
 #include <crypto/chacha20.h>
 #include <crypto/sha256.h>
 #include <crypto/sha512.h>
-#include <logging.h>
 #include <randomenv.h>
 #include <span.h>
 #include <support/allocators/secure.h>
@@ -503,7 +502,7 @@ void SeedStrengthen(CSHA512& hasher, RNGState& rng, SteadyClock::duration dur) n
     Strengthen(strengthen_seed, dur, hasher);
 }
 
-void SeedPeriodic(CSHA512& hasher, RNGState& rng) noexcept
+size_t SeedPeriodic(CSHA512& hasher, RNGState& rng) noexcept
 {
     // Everything that the 'fast' seeder includes
     SeedFast(hasher);
@@ -517,13 +516,15 @@ void SeedPeriodic(CSHA512& hasher, RNGState& rng) noexcept
     // Dynamic environment data (clocks, resource usage, ...)
     auto old_size = hasher.Size();
     RandAddDynamicEnv(hasher);
-    LogDebug(BCLog::RAND, "Feeding %i bytes of dynamic environment data into RNG\n", hasher.Size() - old_size);
+    size_t env_bytes = hasher.Size() - old_size;
 
     // Strengthen for 10 ms
     SeedStrengthen(hasher, rng, 10ms);
+
+    return env_bytes;
 }
 
-void SeedStartup(CSHA512& hasher, RNGState& rng) noexcept
+size_t SeedStartup(CSHA512& hasher, RNGState& rng) noexcept
 {
     // Gather 256 bits of hardware randomness, if available
     SeedHardwareSlow(hasher);
@@ -537,10 +538,12 @@ void SeedStartup(CSHA512& hasher, RNGState& rng) noexcept
 
     // Static environment data
     RandAddStaticEnv(hasher);
-    LogDebug(BCLog::RAND, "Feeding %i bytes of environment data into RNG\n", hasher.Size() - old_size);
+    size_t env_bytes = hasher.Size() - old_size;
 
     // Strengthen for 100 ms
     SeedStrengthen(hasher, rng, 100ms);
+
+    return env_bytes;
 }
 
 enum class RNGLevel {
@@ -549,7 +552,7 @@ enum class RNGLevel {
     PERIODIC, //!< Called by RandAddPeriodic()
 };
 
-void ProcRand(unsigned char* out, int num, RNGLevel level, bool always_use_real_rng) noexcept
+size_t ProcRand(unsigned char* out, int num, RNGLevel level, bool always_use_real_rng) noexcept
 {
     // Make sure the RNG is initialized first (as all Seed* function possibly need hwrand to be available).
     RNGState& rng = GetRNGState();
@@ -557,6 +560,7 @@ void ProcRand(unsigned char* out, int num, RNGLevel level, bool always_use_real_
     assert(num <= 32);
 
     CSHA512 hasher;
+    size_t env_bytes{0};
     switch (level) {
     case RNGLevel::FAST:
         SeedFast(hasher);
@@ -565,7 +569,7 @@ void ProcRand(unsigned char* out, int num, RNGLevel level, bool always_use_real_
         SeedSlow(hasher, rng);
         break;
     case RNGLevel::PERIODIC:
-        SeedPeriodic(hasher, rng);
+        env_bytes = SeedPeriodic(hasher, rng);
         break;
     }
 
@@ -573,9 +577,11 @@ void ProcRand(unsigned char* out, int num, RNGLevel level, bool always_use_real_
     if (!rng.MixExtract(out, num, std::move(hasher), false, always_use_real_rng)) {
         // On the first invocation, also seed with SeedStartup().
         CSHA512 startup_hasher;
-        SeedStartup(startup_hasher, rng);
+        env_bytes = SeedStartup(startup_hasher, rng);
         rng.MixExtract(out, num, std::move(startup_hasher), true, always_use_real_rng);
     }
+
+    return env_bytes;
 }
 
 } // namespace
@@ -599,9 +605,9 @@ void GetStrongRandBytes(std::span<unsigned char> bytes) noexcept
     ProcRand(bytes.data(), bytes.size(), RNGLevel::SLOW, /*always_use_real_rng=*/true);
 }
 
-void RandAddPeriodic() noexcept
+size_t RandAddPeriodic() noexcept
 {
-    ProcRand(nullptr, 0, RNGLevel::PERIODIC, /*always_use_real_rng=*/false);
+    return ProcRand(nullptr, 0, RNGLevel::PERIODIC, /*always_use_real_rng=*/false);
 }
 
 void RandAddEvent(const uint32_t event_info) noexcept { GetRNGState().AddEvent(event_info); }
