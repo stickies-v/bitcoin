@@ -103,7 +103,7 @@ std::string PermsToSymbolicString(fs::perms p);
 std::optional<fs::perms> InterpretPermString(const std::string& s);
 
 #ifdef WIN32
-fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
+std::optional<fs::path> GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
 
 #endif // BITCOIN_UTIL_FS_HELPERS_H

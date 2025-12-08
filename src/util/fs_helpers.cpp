@@ -7,7 +7,6 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
-#include <logging.h>
 #include <sync.h>
 #include <util/expected.h>
 #include <util/fs.h>
@@ -225,7 +224,7 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
 }
 
 #ifdef WIN32
-fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
+std::optional<fs::path> GetSpecialFolderPath(int nFolder, bool fCreate)
 {
     WCHAR pszPath[MAX_PATH] = L"";
 
@@ -233,8 +232,7 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
         return fs::path(pszPath);
     }
 
-    LogError("SHGetSpecialFolderPathW() failed, could not obtain requested path.");
-    return fs::path("");
+    return std::nullopt;
 }
 #endif
 

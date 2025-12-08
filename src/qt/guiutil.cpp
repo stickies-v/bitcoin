@@ -510,11 +510,12 @@ bool LabelOutOfFocusEventFilter::eventFilter(QObject* watched, QEvent* event)
 fs::path static StartupShortcutPath()
 {
     ChainType chain = gArgs.GetChainType();
+    fs::path startup_dir{Assert(GetSpecialFolderPath(CSIDL_STARTUP)).value()};
     if (chain == ChainType::MAIN)
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin.lnk";
+        return startup_dir / "Bitcoin.lnk";
     if (chain == ChainType::TESTNET) // Remove this special case when testnet CBaseChainParams::DataDir() is incremented to "testnet4"
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin (testnet).lnk";
-    return GetSpecialFolderPath(CSIDL_STARTUP) / fs::u8path(strprintf("Bitcoin (%s).lnk", ChainTypeToString(chain)));
+        return startup_dir / "Bitcoin (testnet).lnk";
+    return startup_dir / fs::u8path(strprintf("Bitcoin (%s).lnk", ChainTypeToString(chain)));
 }
 
 bool GetStartOnSystemStartup()

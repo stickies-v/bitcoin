@@ -743,11 +743,16 @@ fs::path GetDefaultDataDir()
 #ifdef WIN32
     // Windows
     // Check for existence of datadir in old location and keep it there
-    fs::path legacy_path = GetSpecialFolderPath(CSIDL_APPDATA) / "Bitcoin";
-    if (fs::exists(legacy_path)) return legacy_path;
+    if (auto legacy_path = GetSpecialFolderPath(CSIDL_APPDATA)) {
+        if (fs::exists(*legacy_path / "Bitcoin")) {
+            return *legacy_path / "Bitcoin";
+        }
+    } else {
+        LogError("SHGetSpecialFolderPathW() failed, could not obtain requested path.");
+    }
 
     // Otherwise, fresh installs can start in the new, "proper" location
-    return GetSpecialFolderPath(CSIDL_LOCAL_APPDATA) / "Bitcoin";
+    return Assert(GetSpecialFolderPath(CSIDL_LOCAL_APPDATA)).value() / "Bitcoin";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
