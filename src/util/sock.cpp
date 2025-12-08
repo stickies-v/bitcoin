@@ -4,7 +4,6 @@
 
 #include <common/system.h>
 #include <compat/compat.h>
-#include <logging.h>
 #include <tinyformat.h>
 #include <util/sock.h>
 #include <util/syserror.h>
@@ -404,13 +403,10 @@ void Sock::Close()
         return;
     }
 #ifdef WIN32
-    int ret = closesocket(m_socket);
+    closesocket(m_socket);
 #else
-    int ret = close(m_socket);
+    close(m_socket);
 #endif
-    if (ret) {
-        LogWarning("Error closing socket %d: %s", m_socket, NetworkErrorString(WSAGetLastError()));
-    }
     m_socket = INVALID_SOCKET;
 }
 
