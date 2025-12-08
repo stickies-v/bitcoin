@@ -89,7 +89,7 @@ static_assert(CPUID_F1_ECX_RDRAND == bit_RDRND, "Unexpected value for bit_RDRND"
 static_assert(CPUID_F7_EBX_RDSEED == bit_RDSEED, "Unexpected value for bit_RDSEED");
 #endif
 
-void InitHardwareRand()
+std::optional<HardwareRngInfo> InitHardwareRand()
 {
     uint32_t eax, ebx, ecx, edx;
     GetCPUID(1, 0, eax, ebx, ecx, edx);
@@ -100,18 +100,9 @@ void InitHardwareRand()
     if (ebx & CPUID_F7_EBX_RDSEED) {
         g_rdseed_supported = true;
     }
-}
-
-void ReportHardwareRand()
-{
-    // This must be done in a separate function, as InitHardwareRand() may be indirectly called
-    // from global constructors, before logging is initialized.
-    if (g_rdseed_supported) {
-        LogInfo("Using RdSeed as an additional entropy source");
-    }
-    if (g_rdrand_supported) {
-        LogInfo("Using RdRand as an additional entropy source");
-    }
+    return {
+        .rdrand_supported = g_rdrand_supported,
+        .rdseed_supported = g_rdseed_supported};
 }
 
 /** Read 64 bits of entropy using rdrand.
@@ -191,8 +182,7 @@ uint64_t GetRdSeed() noexcept
  * Slower sources should probably be invoked separately, and/or only from
  * RandAddPeriodic (which is called once a minute).
  */
-void InitHardwareRand() {}
-void ReportHardwareRand() {}
+std::optional<HardwareRngInfo> InitHardwareRand() { return std::nullopt; }
 #endif
 
 /** Add 64 bits of entropy gathered from hardware to hasher. Do nothing if not supported. */
@@ -359,9 +349,9 @@ class RNGState {
     CSHA256 m_events_hasher GUARDED_BY(m_events_mutex);
 
 public:
-    RNGState() noexcept
+    const std::optional<HardwareRngInfo> m_hardware_info;
+    RNGState() noexcept : m_hardware_info{InitHardwareRand()}
     {
-        InitHardwareRand();
     }
 
     ~RNGState() = default;
@@ -693,12 +683,11 @@ FastRandomContext::FastRandomContext(bool fDeterministic) noexcept : requires_se
     // use.
 }
 
-void RandomInit()
+std::optional<HardwareRngInfo> RandomInit()
 {
     // Invoke RNG code to trigger initialization (if not already performed)
     ProcRand(nullptr, 0, RNGLevel::FAST, /*always_use_real_rng=*/true);
-
-    ReportHardwareRand();
+    return GetRNGState().m_hardware_info;
 }
 
 double MakeExponentiallyDistributed(uint64_t uniform) noexcept

@@ -102,7 +102,15 @@ MAIN_FUNCTION
     }
 
     SetupEnvironment();
-    RandomInit();
+    {
+        auto info{RandomInit()};
+        if (info && info->rdseed_supported) {
+            LogInfo("Using RdSeed as an additional entropy source");
+        }
+        if (info && info->rdrand_supported) {
+            LogInfo("Using RdRand as an additional entropy source");
+        }
+    }
     try {
         if (const auto maybe_exit{WalletAppInit(args, argc, argv)}) return *maybe_exit;
     } catch (const std::exception& e) {

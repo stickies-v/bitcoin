@@ -74,13 +74,18 @@
 
 /* ============================= INITIALIZATION AND ADDING ENTROPY ============================= */
 
+struct HardwareRngInfo {
+    bool rdrand_supported;
+    bool rdseed_supported;
+};
+
 /**
  * Initialize global RNG state and log any CPU features that are used.
  *
  * Calling this function is optional. RNG state will be initialized when first
  * needed if it is not called.
  */
-void RandomInit();
+std::optional<HardwareRngInfo> RandomInit();
 
 /**
  * Gather entropy from various expensive sources, and feed them to the PRNG state.
