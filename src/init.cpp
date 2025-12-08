@@ -19,6 +19,7 @@
 #include <common/args.h>
 #include <common/asmap.h>
 #include <common/system.h>
+#include <common/thread.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <deploymentstatus.h>
@@ -85,7 +86,6 @@
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/syserror.h>
-#include <util/thread.h>
 #include <util/threadnames.h>
 #include <util/time.h>
 #include <util/translation.h>
@@ -1430,7 +1430,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     auto& scheduler = *node.scheduler;
 
     // Start the lightweight task scheduler thread
-    scheduler.m_service_thread = std::thread(util::TraceThread, "scheduler", [&] { scheduler.serviceQueue(); });
+    scheduler.m_service_thread = std::thread(common::TraceThread, "scheduler", [&] { scheduler.serviceQueue(); });
 
     // Gather some entropy once per minute.
     scheduler.scheduleEvery([]{
@@ -1961,7 +1961,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         vImportFiles.push_back(fs::PathFromString(strFile));
     }
 
-    node.background_init_thread = std::thread(&util::TraceThread, "initload", [=, &chainman, &args, &node] {
+    node.background_init_thread = std::thread(&common::TraceThread, "initload", [=, &chainman, &args, &node] {
         if (const auto& res{ScheduleBatchPriority()}; !res) {
             LogWarning("ScheduleBatchPriority failed: %s", res.error());
         }

@@ -8,6 +8,7 @@
 #include <chainparams.h>
 #include <chainparamsbase.h>
 #include <common/args.h>
+#include <common/thread.h>
 #include <compat/compat.h>
 #include <crypto/hmac_sha256.h>
 #include <logging.h>
@@ -21,7 +22,6 @@
 #include <util/readwritefile.h>
 #include <util/strencodings.h>
 #include <util/string.h>
-#include <util/thread.h>
 #include <util/time.h>
 
 #include <algorithm>
@@ -698,7 +698,7 @@ void StartTorControl(CService onion_service_target)
         return;
     }
 
-    torControlThread = std::thread(&util::TraceThread, "torcontrol", [onion_service_target] {
+    torControlThread = std::thread(&common::TraceThread, "torcontrol", [onion_service_target] {
         TorControlThread(onion_service_target);
     });
 }

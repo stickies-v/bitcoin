@@ -8,12 +8,12 @@
 #include <common/netif.h>
 #include <common/pcp.h>
 #include <common/system.h>
+#include <common/thread.h>
 #include <logging.h>
 #include <net.h>
 #include <netaddress.h>
 #include <netbase.h>
 #include <random.h>
-#include <util/thread.h>
 #include <util/threadinterrupt.h>
 
 #include <atomic>
@@ -130,7 +130,7 @@ void StartThreadMapPort()
 {
     if (!g_mapport_thread.joinable()) {
         assert(!g_mapport_interrupt);
-        g_mapport_thread = std::thread(&util::TraceThread, "mapport", &ThreadMapPort);
+        g_mapport_thread = std::thread(&common::TraceThread, "mapport", &ThreadMapPort);
     }
 }
 

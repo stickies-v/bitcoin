@@ -6,6 +6,7 @@
 
 #include <chain.h>
 #include <common/args.h>
+#include <common/thread.h>
 #include <dbwrapper.h>
 #include <interfaces/chain.h>
 #include <interfaces/types.h>
@@ -23,7 +24,6 @@
 #include <undo.h>
 #include <util/fs.h>
 #include <util/string.h>
-#include <util/thread.h>
 #include <util/threadinterrupt.h>
 #include <util/time.h>
 #include <util/translation.h>
@@ -455,7 +455,7 @@ bool BaseIndex::StartBackgroundSync()
 {
     if (!m_init) throw std::logic_error("Error: Cannot start a non-initialized index");
 
-    m_thread_sync = std::thread(&util::TraceThread, GetName(), [this] { Sync(); });
+    m_thread_sync = std::thread(&common::TraceThread, GetName(), [this] { Sync(); });
     return true;
 }
 

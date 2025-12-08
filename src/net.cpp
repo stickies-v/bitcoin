@@ -13,6 +13,7 @@
 #include <clientversion.h>
 #include <common/args.h>
 #include <common/netif.h>
+#include <common/thread.h>
 #include <compat/compat.h>
 #include <consensus/consensus.h>
 #include <crypto/sha256.h>
@@ -31,7 +32,6 @@
 #include <util/fs.h>
 #include <util/sock.h>
 #include <util/strencodings.h>
-#include <util/thread.h>
 #include <util/threadinterrupt.h>
 #include <util/trace.h>
 #include <util/translation.h>
@@ -3381,15 +3381,15 @@ bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
     }
 
     // Send and receive from sockets, accept connections
-    threadSocketHandler = std::thread(&util::TraceThread, "net", [this] { ThreadSocketHandler(); });
+    threadSocketHandler = std::thread(&common::TraceThread, "net", [this] { ThreadSocketHandler(); });
 
     if (!gArgs.GetBoolArg("-dnsseed", DEFAULT_DNSSEED))
         LogPrintf("DNS seeding disabled\n");
     else
-        threadDNSAddressSeed = std::thread(&util::TraceThread, "dnsseed", [this] { ThreadDNSAddressSeed(); });
+        threadDNSAddressSeed = std::thread(&common::TraceThread, "dnsseed", [this] { ThreadDNSAddressSeed(); });
 
     // Initiate manual connections
-    threadOpenAddedConnections = std::thread(&util::TraceThread, "addcon", [this] { ThreadOpenAddedConnections(); });
+    threadOpenAddedConnections = std::thread(&common::TraceThread, "addcon", [this] { ThreadOpenAddedConnections(); });
 
     if (connOptions.m_use_addrman_outgoing && !connOptions.m_specified_outgoing.empty()) {
         if (m_client_interface) {
@@ -3401,16 +3401,16 @@ bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
     }
     if (connOptions.m_use_addrman_outgoing || !connOptions.m_specified_outgoing.empty()) {
         threadOpenConnections = std::thread(
-            &util::TraceThread, "opencon",
+            &common::TraceThread, "opencon",
             [this, connect = connOptions.m_specified_outgoing, seed_nodes = std::move(seed_nodes)] { ThreadOpenConnections(connect, seed_nodes); });
     }
 
     // Process messages
-    threadMessageHandler = std::thread(&util::TraceThread, "msghand", [this] { ThreadMessageHandler(); });
+    threadMessageHandler = std::thread(&common::TraceThread, "msghand", [this] { ThreadMessageHandler(); });
 
     if (m_i2p_sam_session) {
         threadI2PAcceptIncoming =
-            std::thread(&util::TraceThread, "i2paccept", [this] { ThreadI2PAcceptIncoming(); });
+            std::thread(&common::TraceThread, "i2paccept", [this] { ThreadI2PAcceptIncoming(); });
     }
 
     // Dump network addresses

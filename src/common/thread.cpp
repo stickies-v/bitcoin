@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <util/thread.h>
+#include <common/thread.h>
 
 #include <logging.h>
 #include <util/exception.h>
@@ -13,7 +13,7 @@
 #include <string>
 #include <utility>
 
-void util::TraceThread(std::string_view thread_name, std::function<void()> thread_func)
+void common::TraceThread(std::string_view thread_name, std::function<void()> thread_func)
 {
     util::ThreadRename(std::string{thread_name});
     try {

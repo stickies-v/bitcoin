@@ -8,6 +8,7 @@
 #include <banman.h>
 #include <chainparams.h>
 #include <common/system.h>
+#include <common/thread.h>
 #include <consensus/consensus.h>
 #include <consensus/params.h>
 #include <consensus/validation.h>
@@ -51,7 +52,6 @@
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/task_runner.h>
-#include <util/thread.h>
 #include <util/threadnames.h>
 #include <util/time.h>
 #include <util/translation.h>
@@ -238,7 +238,7 @@ ChainTestingSetup::ChainTestingSetup(const ChainType chainType, TestOpts opts)
     // from blocking due to queue overrun.
     if (opts.setup_validation_interface) {
         m_node.scheduler = std::make_unique<CScheduler>();
-        m_node.scheduler->m_service_thread = std::thread(util::TraceThread, "scheduler", [&] { m_node.scheduler->serviceQueue(); });
+        m_node.scheduler->m_service_thread = std::thread(common::TraceThread, "scheduler", [&] { m_node.scheduler->serviceQueue(); });
         m_node.validation_signals =
             // Use synchronous task runner while fuzzing to avoid non-determinism
             EnableFuzzDeterminism() ?
