@@ -7,6 +7,7 @@
 
 #include <addrman.h>
 #include <addrman_impl.h>
+#include <common/asmap.h>
 #include <net.h>
 #include <net_permissions.h>
 #include <netaddress.h>
@@ -17,7 +18,6 @@
 #include <test/fuzz/util.h>
 #include <test/util/net.h>
 #include <threadsafety.h>
-#include <util/asmap.h>
 #include <util/sock.h>
 
 #include <chrono>

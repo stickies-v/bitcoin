@@ -93,6 +93,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   chainparamsbase.cpp
   coins.cpp
   common/args.cpp
+  common/asmap.cpp
   common/bloom.cpp
   common/config.cpp
   common/init.cpp
