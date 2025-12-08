@@ -35,8 +35,9 @@ FSType GetFilesystemType(const fs::path& path);
 /**
  * Ensure file contents are fully committed to disk, using a platform-specific
  * feature analogous to fsync().
+ * Returns an error string on failure.
  */
-bool FileCommit(FILE* file);
+util::Expected<void, std::string> FileCommit(FILE* file);
 
 /**
  * Sync directory contents. This is required on some environments to ensure that

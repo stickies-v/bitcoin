@@ -5,10 +5,12 @@
 #include <memusage.h>
 #include <span.h>
 #include <streams.h>
+#include <util/expected.h>
 #include <util/fs_helpers.h>
 #include <util/obfuscation.h>
 
 #include <array>
+#include <string>
 
 AutoFile::AutoFile(std::FILE* file, const Obfuscation& obfuscation) : m_file{file}, m_obfuscation{obfuscation}
 {
@@ -126,7 +128,7 @@ void AutoFile::write_buffer(std::span<std::byte> src)
     if (m_position) *m_position += src.size();
 }
 
-bool AutoFile::Commit()
+util::Expected<void, std::string> AutoFile::Commit()
 {
     return ::FileCommit(m_file);
 }

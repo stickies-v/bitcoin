@@ -97,8 +97,8 @@ bool FlatFileSeq::Flush(const FlatFilePos& pos, bool finalize) const
         }
         return false;
     }
-    if (!FileCommit(file)) {
-        LogError("%s: failed to commit file %d\n", __func__, pos.nFile);
+    if (const auto& res{FileCommit(file)}; !res) {
+        LogError("failed to commit file %d (%s)", pos.nFile, res.error());
         if (fclose(file) != 0) {
             LogError("Failed to close file %d", pos.nFile);
         }

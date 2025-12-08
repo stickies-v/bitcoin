@@ -205,9 +205,11 @@ bool DumpMempool(const CTxMemPool& pool, const fs::path& dump_path, FopenFn mock
         LogInfo("Writing %d unbroadcast transactions to file.\n", unbroadcast_txids.size());
         file << unbroadcast_txids;
 
-        if (!skip_file_commit && !file.Commit()) {
-            (void)file.fclose();
-            throw std::runtime_error("Commit failed");
+        if (!skip_file_commit) {
+            if (const auto& res{file.Commit()}; !res) {
+                (void)file.fclose();
+                throw std::runtime_error(tfm::format("Commit failed (%s)", res.error()));
+            }
         }
         if (file.fclose() != 0) {
             throw std::runtime_error(

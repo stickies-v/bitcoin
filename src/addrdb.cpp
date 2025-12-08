@@ -73,10 +73,10 @@ bool SerializeFileDB(const std::string& prefix, const fs::path& path, const Data
         remove(pathTmp);
         return false;
     }
-    if (!fileout.Commit()) {
+    if (const auto& res{fileout.Commit()}; !res) {
         (void)fileout.fclose();
         remove(pathTmp);
-        LogError("%s: Failed to flush file %s\n", __func__, fs::PathToString(pathTmp));
+        LogError("Failed to flush file %s (%s)", fs::PathToString(pathTmp), res.error());
         return false;
     }
     if (fileout.fclose() != 0) {

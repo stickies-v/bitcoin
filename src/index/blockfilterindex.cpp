@@ -178,8 +178,8 @@ bool BlockFilterIndex::CustomCommit(CDBBatch& batch)
         LogError("Failed to open filter file %d", pos.nFile);
         return false;
     }
-    if (!file.Commit()) {
-        LogError("Failed to commit filter file %d", pos.nFile);
+    if (const auto& res{file.Commit()}; !res) {
+        LogError("Failed to commit filter file %d (%s)", pos.nFile, res.error());
         (void)file.fclose();
         return false;
     }
@@ -237,8 +237,8 @@ size_t BlockFilterIndex::WriteFilterToDisk(FlatFilePos& pos, const BlockFilter& 
             LogError("Failed to truncate filter file %d", pos.nFile);
             return 0;
         }
-        if (!last_file.Commit()) {
-            LogError("Failed to commit filter file %d", pos.nFile);
+        if (const auto& res{last_file.Commit()}; !res) {
+            LogError("Failed to commit filter file %d (%s)", pos.nFile, res.error());
             (void)last_file.fclose();
             return 0;
         }

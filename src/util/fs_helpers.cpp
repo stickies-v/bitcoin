@@ -102,35 +102,30 @@ std::streampos GetFileSize(const char* path, std::streamsize max)
     return file.gcount();
 }
 
-bool FileCommit(FILE* file)
+util::Expected<void, std::string> FileCommit(FILE* file)
 {
     if (fflush(file) != 0) { // harmless if redundantly called
-        LogError("fflush failed: %s", SysErrorString(errno));
-        return false;
+        return util::Unexpected{tfm::format("fflush failed: %s", SysErrorString(errno))};
     }
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     if (FlushFileBuffers(hFile) == 0) {
-        LogError("FlushFileBuffers failed: %s", Win32ErrorString(GetLastError()));
-        return false;
+        return util::Unexpected{tfm::format("FlushFileBuffers failed: %s", Win32ErrorString(GetLastError()))};
     }
 #elif defined(__APPLE__) && defined(F_FULLFSYNC)
     if (fcntl(fileno(file), F_FULLFSYNC, 0) == -1) { // Manpage says "value other than -1" is returned on success
-        LogError("fcntl F_FULLFSYNC failed: %s", SysErrorString(errno));
-        return false;
+        return util::Unexpected{tfm::format("fcntl F_FULLFSYNC failed: %s", SysErrorString(errno))};
     }
 #elif HAVE_FDATASYNC
     if (fdatasync(fileno(file)) != 0 && errno != EINVAL) { // Ignore EINVAL for filesystems that don't support sync
-        LogError("fdatasync failed: %s", SysErrorString(errno));
-        return false;
+        return util::Unexpected{tfm::format("fdatasync failed: %s", SysErrorString(errno))};
     }
 #else
     if (fsync(fileno(file)) != 0 && errno != EINVAL) {
-        LogError("fsync failed: %s", SysErrorString(errno));
-        return false;
+        return util::Unexpected{tfm::format("fsync failed: %s", SysErrorString(errno))};
     }
 #endif
-    return true;
+    return {};
 }
 
 void DirectoryCommit(const fs::path& dirname)

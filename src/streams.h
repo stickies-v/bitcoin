@@ -11,6 +11,7 @@
 #include <span.h>
 #include <support/allocators/zeroafterfree.h>
 #include <util/check.h>
+#include <util/expected.h>
 #include <util/obfuscation.h>
 #include <util/overflow.h>
 #include <util/syserror.h>
@@ -439,7 +440,7 @@ public:
     int64_t size();
 
     /** Wrapper around FileCommit(). */
-    bool Commit();
+    util::Expected<void, std::string> Commit();
 
     /** Wrapper around TruncateFile(). */
     bool Truncate(unsigned size);
