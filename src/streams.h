@@ -6,10 +6,10 @@
 #ifndef BITCOIN_STREAMS_H
 #define BITCOIN_STREAMS_H
 
-#include <logging.h>
 #include <serialize.h>
 #include <span.h>
 #include <support/allocators/zeroafterfree.h>
+#include <tinyformat.h>
 #include <util/check.h>
 #include <util/obfuscation.h>
 #include <util/overflow.h>
@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ios>
+#include <iostream>
 #include <limits>
 #include <optional>
 #include <string>
@@ -392,7 +393,7 @@ public:
         }
 
         if (fclose() != 0) {
-            LogError("Failed to close file: %s", SysErrorString(errno));
+            tfm::format(std::cerr, "Failed to close file: %s\n", SysErrorString(errno));
         }
     }
 
