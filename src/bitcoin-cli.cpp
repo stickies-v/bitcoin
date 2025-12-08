@@ -8,6 +8,7 @@
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <common/system.h>
 #include <compat/compat.h>
 #include <compat/stdin.h>
@@ -19,7 +20,6 @@
 #include <tinyformat.h>
 #include <univalue.h>
 #include <util/chaintype.h>
-#include <util/exception.h>
 #include <util/strencodings.h>
 #include <util/time.h>
 #include <util/translation.h>

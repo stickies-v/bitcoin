@@ -4,8 +4,8 @@
 
 #include <qt/initexecutor.h>
 
+#include <common/exception.h>
 #include <interfaces/node.h>
-#include <util/exception.h>
 #include <util/threadnames.h>
 
 #include <exception>

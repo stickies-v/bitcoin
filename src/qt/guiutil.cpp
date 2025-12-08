@@ -14,6 +14,7 @@
 #include <base58.h>
 #include <chainparams.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <interfaces/node.h>
 #include <key_io.h>
 #include <logging.h>
@@ -22,7 +23,6 @@
 #include <protocol.h>
 #include <script/script.h>
 #include <util/chaintype.h>
-#include <util/exception.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
 #include <util/time.h>

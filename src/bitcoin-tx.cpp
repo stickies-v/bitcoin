@@ -8,6 +8,7 @@
 #include <clientversion.h>
 #include <coins.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <common/system.h>
 #include <compat/compat.h>
 #include <consensus/amount.h>
@@ -20,7 +21,6 @@
 #include <script/sign.h>
 #include <script/signingprovider.h>
 #include <univalue.h>
-#include <util/exception.h>
 #include <util/fs.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>

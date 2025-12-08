@@ -8,6 +8,7 @@
 
 #include <chainparams.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <common/init.h>
 #include <common/system.h>
 #include <init.h>
@@ -31,7 +32,6 @@
 #include <qt/utilitydialog.h>
 #include <qt/winshutdownmonitor.h>
 #include <uint256.h>
-#include <util/exception.h>
 #include <util/string.h>
 #include <util/threadnames.h>
 #include <util/translation.h>

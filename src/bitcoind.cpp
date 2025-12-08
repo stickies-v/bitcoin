@@ -8,6 +8,7 @@
 #include <chainparams.h>
 #include <clientversion.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <common/init.h>
 #include <common/system.h>
 #include <compat/compat.h>
@@ -20,7 +21,6 @@
 #include <node/warnings.h>
 #include <noui.h>
 #include <util/check.h>
-#include <util/exception.h>
 #include <util/signalinterrupt.h>
 #include <util/strencodings.h>
 #include <util/syserror.h>

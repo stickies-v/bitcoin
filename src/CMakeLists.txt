@@ -96,6 +96,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/asmap.cpp
   common/bloom.cpp
   common/config.cpp
+  common/exception.cpp
   common/init.cpp
   common/interfaces.cpp
   common/messages.cpp

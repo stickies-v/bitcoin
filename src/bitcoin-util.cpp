@@ -10,11 +10,11 @@
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <common/args.h>
+#include <common/exception.h>
 #include <common/system.h>
 #include <compat/compat.h>
 #include <core_io.h>
 #include <streams.h>
-#include <util/exception.h>
 #include <util/strencodings.h>
 #include <util/translation.h>
 
