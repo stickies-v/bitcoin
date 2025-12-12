@@ -9,7 +9,9 @@
 
 #include <threadsafety.h>
 #include <tinyformat.h>
+#include <util/macros.h>
 #include <util/string.h>
+#include <util/time.h>
 
 #include <atomic>
 #include <chrono>
@@ -114,6 +116,30 @@ private:
 
 //! Get the global kernel logger instance.
 Logger& GetLogger();
+
+//! RAII timer that logs elapsed milliseconds at debug level.
+class DebugMilliTimer
+{
+public:
+    DebugMilliTimer(Logger& logger, Category cat, std::string msg, std::source_location loc = std::source_location::current())
+        : m_logger(logger), m_msg(std::move(msg)), m_cat(cat), m_loc(loc) {}
+
+    ~DebugMilliTimer()
+    {
+        if (!m_logger.WillLog(Level::Debug)) return;
+        const auto elapsed{Ticks<MillisecondsDouble>(std::chrono::steady_clock::now() - m_start)};
+        m_logger.Log(Level::Debug, m_cat, m_loc, "%s (%.2fms)", m_msg, elapsed);
+    }
+
+private:
+    Logger& m_logger;
+    std::string m_msg;
+    Category m_cat;
+    std::source_location m_loc;
+    std::chrono::steady_clock::time_point m_start{std::chrono::steady_clock::now()};
+};
+
+
 } // namespace kernel
 
 //! Log at Info/Warning/Error level. Category defaults to ALL.
@@ -129,5 +155,9 @@ Logger& GetLogger();
     kernel::GetLogger().Log(kernel::Level::Debug, category, std::source_location::current(), __VA_ARGS__)
 #define KernelLogTrace(category, ...) \
     kernel::GetLogger().Log(kernel::Level::Trace, category, std::source_location::current(), __VA_ARGS__)
+
+//! RAII-style timer macros that log elapsed time at debug level.
+#define KernelLogDebugTimedMillis(category, msg) \
+    kernel::DebugMilliTimer UNIQUE_NAME(kernel_timer)(kernel::GetLogger(), category, msg)
 
 #endif // BITCOIN_KERNEL_LOG_H

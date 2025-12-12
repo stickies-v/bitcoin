@@ -29,7 +29,6 @@
 #include <kernel/messagestartchars.h>
 #include <kernel/notifications_interface.h>
 #include <kernel/warning.h>
-#include <logging/timer.h>
 #include <node/blockstorage.h>
 #include <node/utxo_snapshot.h>
 #include <policy/ephemeral_policy.h>
@@ -2818,14 +2817,14 @@ bool Chainstate::FlushStateToDisk(
             }
 
             if (nManualPruneHeight > 0) {
-                LOG_TIME_MILLIS_WITH_CATEGORY("find files to prune (manual)", BCLog::BENCH);
+                KernelLogDebugTimedMillis(kernel::Category::BENCH, "find files to prune (manual)");
 
                 m_blockman.FindFilesToPruneManual(
                     setFilesToPrune,
                     std::min(last_prune, nManualPruneHeight),
                     *this, m_chainman);
             } else {
-                LOG_TIME_MILLIS_WITH_CATEGORY("find files to prune", BCLog::BENCH);
+                KernelLogDebugTimedMillis(kernel::Category::BENCH, "find files to prune");
 
                 m_blockman.FindFilesToPrune(setFilesToPrune, last_prune, *this, m_chainman);
                 m_blockman.m_check_for_pruning = false;
@@ -2857,7 +2856,7 @@ bool Chainstate::FlushStateToDisk(
                 return FatalError(m_chainman.GetNotifications(), state, _("Disk space is too low!"));
             }
             {
-                LOG_TIME_MILLIS_WITH_CATEGORY("write block and undo data to disk", BCLog::BENCH);
+                KernelLogDebugTimedMillis(kernel::Category::BENCH, "write block and undo data to disk");
 
                 // First make sure all block and undo data is flushed to disk.
                 // TODO: Handle return error, or add detailed comment why it is
@@ -2869,7 +2868,7 @@ bool Chainstate::FlushStateToDisk(
 
             // Then update all block file information (which may refer to block and undo files).
             {
-                LOG_TIME_MILLIS_WITH_CATEGORY("write block index to disk", BCLog::BENCH);
+                KernelLogDebugTimedMillis(kernel::Category::BENCH, "write block index to disk");
 
                 if (!m_blockman.WriteBlockIndexDB()) {
                     return FatalError(m_chainman.GetNotifications(), state, _("Failed to write to block index database."));
@@ -2877,15 +2876,18 @@ bool Chainstate::FlushStateToDisk(
             }
             // Finally remove any pruned files
             if (fFlushForPrune) {
-                LOG_TIME_MILLIS_WITH_CATEGORY("unlink pruned files", BCLog::BENCH);
+                KernelLogDebugTimedMillis(kernel::Category::BENCH, "unlink pruned files");
 
                 m_blockman.UnlinkPrunedFiles(setFilesToPrune);
             }
 
             if (!CoinsTip().GetBestBlock().IsNull()) {
                 if (coins_mem_usage >= WARN_FLUSH_COINS_SIZE) KernelLogWarning("Flushing large (%d GiB) UTXO set to disk, it may take several minutes", coins_mem_usage >> 30);
-                LOG_TIME_MILLIS_WITH_CATEGORY(strprintf("write coins cache to disk (%d coins, %.2fKiB)",
-                    coins_count, coins_mem_usage >> 10), BCLog::BENCH);
+                KernelLogDebugTimedMillis(
+                    kernel::Category::BENCH,
+                    strprintf(
+                        "write coins cache to disk (%d coins, %.2fKiB)",
+                        coins_count, coins_mem_usage >> 10));
 
                 // Typical Coin structures on disk are around 48 bytes in size.
                 // Pushing a new one to the database can cause it to be written
@@ -5856,11 +5858,12 @@ util::Result<CBlockIndex*> ChainstateManager::ActivateSnapshot(
 
 static void FlushSnapshotToDisk(CCoinsViewCache& coins_cache, bool snapshot_loaded)
 {
-    LOG_TIME_MILLIS_WITH_CATEGORY_MSG_ONCE(
-        strprintf("%s (%.2f MB)",
-                  snapshot_loaded ? "saving snapshot chainstate" : "flushing coins cache",
-                  coins_cache.DynamicMemoryUsage() / (1000 * 1000)),
-        BCLog::LogFlags::ALL);
+    KernelLogDebugTimedMillis(
+        kernel::Category::ALL,
+        strprintf(
+            "%s (%.2f MB)",
+            snapshot_loaded ? "saving snapshot chainstate" : "flushing coins cache",
+            coins_cache.DynamicMemoryUsage() / (1000 * 1000)));
 
     coins_cache.Flush();
 }
