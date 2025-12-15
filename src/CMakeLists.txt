@@ -117,6 +117,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   kernel/chainparams.cpp
   key.cpp
   key_io.cpp
+  logging.cpp
   merkleblock.cpp
   musig.cpp
   net_permissions.cpp
