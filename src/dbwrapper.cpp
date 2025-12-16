@@ -4,13 +4,13 @@
 
 #include <dbwrapper.h>
 
-#include <logging.h>
 #include <random.h>
 #include <serialize.h>
 #include <span.h>
 #include <streams.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
+#include <util/log.h>
 #include <util/obfuscation.h>
 #include <util/strencodings.h>
 
@@ -57,9 +57,9 @@ public:
     // This code is adapted from posix_logger.h, which is why it is using vsprintf.
     // Please do not do this in normal code
     void Logv(const char * format, va_list ap) override {
-            if (!LogAcceptCategory(BCLog::LEVELDB, BCLog::Level::Debug)) {
-                return;
-            }
+        if (!util::log::GetLogger().WillLog(util::log::Level::Debug)) {
+            return;
+        }
             char buffer[500];
             for (int iter = 0; iter < 2; iter++) {
                 char* base;
@@ -276,7 +276,7 @@ CDBWrapper::~CDBWrapper()
 
 bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
 {
-    const bool log_memory = LogAcceptCategory(BCLog::LEVELDB, BCLog::Level::Debug);
+    const bool log_memory = util::log::GetLogger().WillLog(util::log::Level::Debug);
     double mem_before = 0;
     if (log_memory) {
         mem_before = DynamicMemoryUsage() / 1024.0 / 1024;

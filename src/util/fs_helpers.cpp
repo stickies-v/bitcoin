@@ -7,9 +7,9 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
-#include <logging.h>
 #include <sync.h>
 #include <util/fs.h>
+#include <util/log.h>
 #include <util/syserror.h>
 
 #include <cerrno>

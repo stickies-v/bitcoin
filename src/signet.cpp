@@ -10,13 +10,13 @@
 #include <consensus/validation.h>
 #include <core_io.h>
 #include <hash.h>
-#include <logging.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <span.h>
 #include <streams.h>
 #include <uint256.h>
+#include <util/log.h>
 #include <util/strencodings.h>
 
 #include <algorithm>

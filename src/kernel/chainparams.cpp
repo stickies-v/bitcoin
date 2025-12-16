@@ -11,13 +11,13 @@
 #include <consensus/params.h>
 #include <hash.h>
 #include <kernel/messagestartchars.h>
-#include <logging.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <script/script.h>
 #include <uint256.h>
 #include <util/chaintype.h>
+#include <util/log.h>
 #include <util/strencodings.h>
 
 #include <algorithm>

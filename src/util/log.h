@@ -5,6 +5,7 @@
 #ifndef BITCOIN_UTIL_LOG_H
 #define BITCOIN_UTIL_LOG_H
 
+#include <logging/categories.h>
 #include <threadsafety.h>
 #include <tinyformat.h>
 #include <util/string.h>
@@ -106,5 +107,41 @@ private:
 Logger& GetLogger();
 
 } // namespace util::log
+
+#define LogPrintLevel_(category, level, should_ratelimit, ...) \
+    util::log::GetLogger().Log(level, static_cast<uint64_t>(category), std::source_location::current(), should_ratelimit, __VA_ARGS__)
+
+// Log unconditionally. Uses basic rate limiting to mitigate disk filling attacks.
+// Be conservative when using functions that unconditionally log to debug.log!
+// It should not be the case that an inbound peer can fill up a user's storage
+// with debug.log entries.
+#define LogInfo(...) LogPrintLevel_(BCLog::LogFlags::ALL, util::log::Level::Info, /*should_ratelimit=*/true, __VA_ARGS__)
+#define LogWarning(...) LogPrintLevel_(BCLog::LogFlags::ALL, util::log::Level::Warning, /*should_ratelimit=*/true, __VA_ARGS__)
+#define LogError(...) LogPrintLevel_(BCLog::LogFlags::ALL, util::log::Level::Error, /*should_ratelimit=*/true, __VA_ARGS__)
+
+// Deprecated unconditional logging.
+#define LogPrintf(...) LogInfo(__VA_ARGS__)
+
+// Use a macro instead of a function for conditional logging to prevent
+// evaluating arguments when logging for the category is not enabled.
+
+// Log with the specified category and severity level.
+// Level filtering is done here; category filtering and output formatting happen
+// in BCLog::Sink. If level >= Info, logging to disk is rate-limited. This is
+// important so that callers don't need to worry about accidentally introducing
+// a disk-fill vulnerability. Additionally, users specifying -debug are assumed
+// to be developers or power users who are aware that -debug may cause excessive
+// disk usage due to logging.
+#define LogPrintLevel(category, level, ...)                           \
+    do {                                                              \
+        if (util::log::GetLogger().WillLog(level)) {                  \
+            bool rate_limit{level >= util::log::Level::Info};         \
+            LogPrintLevel_(category, level, rate_limit, __VA_ARGS__); \
+        }                                                             \
+    } while (0)
+
+// Log conditionally at Debug/Trace level with the specified category.
+#define LogDebug(category, ...) LogPrintLevel(category, util::log::Level::Debug, __VA_ARGS__)
+#define LogTrace(category, ...) LogPrintLevel(category, util::log::Level::Trace, __VA_ARGS__)
 
 #endif // BITCOIN_UTIL_LOG_H

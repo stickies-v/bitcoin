@@ -11,13 +11,13 @@
 #include <consensus/consensus.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
-#include <logging.h>
 #include <policy/policy.h>
 #include <policy/settings.h>
 #include <random.h>
 #include <tinyformat.h>
 #include <util/check.h>
 #include <util/feefrac.h>
+#include <util/log.h>
 #include <util/moneystr.h>
 #include <util/overflow.h>
 #include <util/result.h>
@@ -280,7 +280,7 @@ CTxMemPool::setEntries CTxMemPool::AssumeCalculateMemPoolAncestors(
 {
     auto result{CalculateMemPoolAncestors(entry, limits, fSearchForParents)};
     if (!Assume(result)) {
-        LogPrintLevel(BCLog::MEMPOOL, BCLog::Level::Error, "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)\n",
+        LogPrintLevel(BCLog::MEMPOOL, util::log::Level::Error, "%s: CalculateMemPoolAncestors failed unexpectedly, continuing with empty ancestor set (%s)\n",
                       calling_fn_name, util::ErrorString(result).original);
     }
     return std::move(result).value_or(CTxMemPool::setEntries{});
