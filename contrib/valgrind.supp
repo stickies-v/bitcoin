@@ -49,12 +49,12 @@
    fun:_Z11LogInstancev
 }
 {
-   Suppress BCLog::Logger::StartLogging() still reachable memory warning
+   Suppress BCLog::Sink::StartLogging() still reachable memory warning
    Memcheck:Leak
    match-leak-kinds: reachable
    fun:malloc
    ...
-   fun:_ZN5BCLog6Logger12StartLoggingEv
+   fun:_ZN5BCLog4Sink12StartLoggingEv
 }
 {
    Suppress https://bugs.kde.org/show_bug.cgi?id=472219 - fixed in Valgrind 3.22.

@@ -11,6 +11,7 @@
 #include <tinyformat.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
+#include <util/log.h>
 #include <util/string.h>
 
 #include <chrono>
@@ -133,7 +134,7 @@ BOOST_FIXTURE_TEST_CASE(logging_LogPrintStr, LogSetup)
     std::vector<std::string> expected;
     for (auto& [msg, category, level, prefix, loc] : cases) {
         expected.push_back(tfm::format("[%s:%s] [%s] %s%s", util::RemovePrefix(loc.file_name(), "./"), loc.line(), loc.function_name(), prefix, msg));
-        LogInstance().LogPrintStr(msg, std::move(loc), category, level, /*should_ratelimit=*/false);
+        LogInstance().LogPrintStr({.level = level, .category = category, .message = msg, .source_loc = std::move(loc), .should_ratelimit = false});
     }
     std::vector<std::string> log_lines{ReadDebugLogLines()};
     BOOST_CHECK_EQUAL_COLLECTIONS(log_lines.begin(), log_lines.end(), expected.begin(), expected.end());
@@ -482,6 +483,166 @@ BOOST_FIXTURE_TEST_CASE(logging_filesize_rate_limit, LogSetup)
             TestLogFromLocation(location, log_message, Status::UNSUPPRESSED, /*suppressions_active=*/false);
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE(logging_level_filtering)
+{
+    util::log::Logger logger;
+    BCLog::Sink sink{logger};
+
+    sink.m_log_timestamps = false;
+    sink.m_log_threadnames = false;
+    sink.m_log_sourcelocations = false;
+
+    std::vector<std::string> log_output;
+    auto cb_it = sink.PushBackCallback([&](const std::string& str) {
+        log_output.push_back(str);
+    });
+
+    sink.StartLogging();
+    sink.EnableCategory(BCLog::NET);
+
+    // Helper to log at a specific level and category
+    auto log_msg = [&](BCLog::Level level, BCLog::LogFlags category, const char* msg) {
+        logger.Log(static_cast<util::log::Level>(level), static_cast<uint64_t>(category),
+                   std::source_location::current(), false, "%s", msg);
+    };
+
+    // Helper to check if output contains a substring
+    auto output_contains = [&](const std::string& substr) {
+        return std::any_of(log_output.begin(), log_output.end(),
+                           [&](const std::string& s) { return s.find(substr) != std::string::npos; });
+    };
+
+    // Test 1: Level is Debug, so Trace should be filtered
+    {
+        log_output.clear();
+        sink.SetLogLevel(BCLog::Level::Debug);
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_msg_1");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_msg_1");
+        BOOST_CHECK(!output_contains("trace_msg_1"));
+        BOOST_CHECK(output_contains("debug_msg_1"));
+    }
+
+    // Test 2: Setting global level to Trace should allow Trace messages
+    {
+        log_output.clear();
+        sink.SetLogLevel(BCLog::Level::Trace);
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_msg_2");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_msg_2");
+        BOOST_CHECK(output_contains("trace_msg_2"));
+        BOOST_CHECK(output_contains("debug_msg_2"));
+    }
+
+    // Test 3: Setting global level to Info should filter Debug and Trace
+    {
+        log_output.clear();
+        sink.SetLogLevel(BCLog::Level::Info);
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_msg_3");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_msg_3");
+        log_msg(BCLog::Level::Info, BCLog::ALL, "info_msg_3");
+        BOOST_CHECK(!output_contains("trace_msg_3"));
+        BOOST_CHECK(!output_contains("debug_msg_3"));
+        BOOST_CHECK(output_contains("info_msg_3"));
+    }
+
+    // Test 4: Category-specific level should override global level (more permissive)
+    {
+        log_output.clear();
+        sink.SetCategoryLogLevel({});             // Clear category levels
+        sink.SetLogLevel(BCLog::Level::Debug);    // Global: Debug
+        sink.SetCategoryLogLevel("net", "trace"); // NET: Trace
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_msg_4_net");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_msg_4_net");
+        BOOST_CHECK(output_contains("trace_msg_4_net"));
+        BOOST_CHECK(output_contains("debug_msg_4_net"));
+    }
+
+    // Test 5: Category-specific level should override global level (more restrictive)
+    {
+        log_output.clear();
+        sink.SetCategoryLogLevel({});            // Clear category levels
+        sink.SetLogLevel(BCLog::Level::Debug);   // Global: Debug
+        sink.SetCategoryLogLevel("net", "info"); // NET: Info (more restrictive)
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_msg_5_net");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_msg_5_net");
+        BOOST_CHECK(!output_contains("trace_msg_5_net"));
+        BOOST_CHECK(!output_contains("debug_msg_5_net"));
+    }
+
+    // Test 6: Info/Warning/Error always log regardless of level settings
+    {
+        log_output.clear();
+        sink.SetCategoryLogLevel({});            // Clear category levels
+        sink.SetLogLevel(BCLog::Level::Warning); // Global: Warning
+        log_msg(BCLog::Level::Info, BCLog::ALL, "info_msg_6");
+        log_msg(BCLog::Level::Warning, BCLog::ALL, "warning_msg_6");
+        log_msg(BCLog::Level::Error, BCLog::ALL, "error_msg_6");
+        // Info+ should always log (per WillLogCategoryLevel logic)
+        BOOST_CHECK(output_contains("info_msg_6"));
+        BOOST_CHECK(output_contains("warning_msg_6"));
+        BOOST_CHECK(output_contains("error_msg_6"));
+    }
+
+    sink.DeleteCallback(cb_it);
+}
+
+BOOST_AUTO_TEST_CASE(logging_callback_filtering)
+{
+    // Test that Logger callbacks are not triggered for filtered messages.
+    // This verifies performance: we shouldn't format strings just to discard them.
+
+    util::log::Logger logger;
+    BCLog::Sink sink{logger};
+
+    sink.EnableCategory(BCLog::NET);
+
+    int callback_count = 0;
+    auto handle = logger.RegisterCallback([&](const util::log::Entry&) {
+        ++callback_count;
+    });
+
+    // Helper to log at a specific level and category
+    auto log_msg = [&](BCLog::Level level, BCLog::LogFlags category, const char* msg) {
+        logger.Log(static_cast<util::log::Level>(level), static_cast<uint64_t>(category),
+                   std::source_location::current(), false, "%s", msg);
+    };
+
+    // Test 1: With level at Debug, Trace messages should not trigger callbacks
+    {
+        callback_count = 0;
+        sink.SetCategoryLogLevel({});
+        sink.SetLogLevel(BCLog::Level::Debug);
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_callback_test_1");
+        BOOST_CHECK_EQUAL(callback_count, 0);
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_callback_test_1");
+        BOOST_CHECK_EQUAL(callback_count, 1);
+    }
+
+    // Test 2: With level at Info, Debug/Trace should not trigger callbacks
+    {
+        callback_count = 0;
+        sink.SetCategoryLogLevel({});
+        sink.SetLogLevel(BCLog::Level::Info);
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_callback_test_2");
+        log_msg(BCLog::Level::Debug, BCLog::NET, "debug_callback_test_2");
+        BOOST_CHECK_EQUAL(callback_count, 0);
+        log_msg(BCLog::Level::Info, BCLog::ALL, "info_callback_test_2");
+        BOOST_CHECK_EQUAL(callback_count, 1);
+    }
+
+    // Test 3: Category-specific level lower than global should still trigger callbacks
+    {
+        callback_count = 0;
+        sink.SetCategoryLogLevel({});
+        sink.SetLogLevel(BCLog::Level::Info);     // Global: Info
+        sink.SetCategoryLogLevel("net", "trace"); // NET: Trace
+        log_msg(BCLog::Level::Trace, BCLog::NET, "trace_callback_test_3");
+        // This SHOULD trigger a callback (category override allows it)
+        BOOST_CHECK_EQUAL(callback_count, 1);
+    }
+
+    logger.UnregisterCallback(handle);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
