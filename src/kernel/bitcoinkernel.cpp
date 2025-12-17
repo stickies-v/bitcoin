@@ -145,60 +145,26 @@ struct btck_BlockValidationState : Handle<btck_BlockValidationState, BlockValida
 
 namespace {
 
-BCLog::Level get_bclog_level(btck_LogLevel level)
+btck_LogCategory to_btck_category(BCLog::LogFlags flag)
 {
-    switch (level) {
-    case btck_LogLevel_INFO: {
-        return BCLog::Level::Info;
+    switch (flag) {
+    case BCLog::ALL: return btck_LogCategory_ALL;
+    case BCLog::BENCH: return btck_LogCategory_BENCH;
+    case BCLog::BLOCKSTORAGE: return btck_LogCategory_BLOCKSTORAGE;
+    case BCLog::COINDB: return btck_LogCategory_COINDB;
+    case BCLog::ESTIMATEFEE: return btck_LogCategory_ESTIMATEFEE;
+    case BCLog::KERNEL: return btck_LogCategory_KERNEL;
+    case BCLog::LEVELDB: return btck_LogCategory_LEVELDB;
+    case BCLog::MEMPOOL: return btck_LogCategory_MEMPOOL;
+    case BCLog::PRUNE: return btck_LogCategory_PRUNE;
+    case BCLog::RAND: return btck_LogCategory_RAND;
+    case BCLog::REINDEX: return btck_LogCategory_REINDEX;
+    case BCLog::TXPACKAGES: return btck_LogCategory_TXPACKAGES;
+    case BCLog::VALIDATION: return btck_LogCategory_VALIDATION;
+    default:
+        assert(false);
+        return btck_LogCategory_ALL;
     }
-    case btck_LogLevel_DEBUG: {
-        return BCLog::Level::Debug;
-    }
-    case btck_LogLevel_TRACE: {
-        return BCLog::Level::Trace;
-    }
-    }
-    assert(false);
-}
-
-BCLog::LogFlags get_bclog_flag(btck_LogCategory category)
-{
-    switch (category) {
-    case btck_LogCategory_BENCH: {
-        return BCLog::LogFlags::BENCH;
-    }
-    case btck_LogCategory_BLOCKSTORAGE: {
-        return BCLog::LogFlags::BLOCKSTORAGE;
-    }
-    case btck_LogCategory_COINDB: {
-        return BCLog::LogFlags::COINDB;
-    }
-    case btck_LogCategory_LEVELDB: {
-        return BCLog::LogFlags::LEVELDB;
-    }
-    case btck_LogCategory_MEMPOOL: {
-        return BCLog::LogFlags::MEMPOOL;
-    }
-    case btck_LogCategory_PRUNE: {
-        return BCLog::LogFlags::PRUNE;
-    }
-    case btck_LogCategory_RAND: {
-        return BCLog::LogFlags::RAND;
-    }
-    case btck_LogCategory_REINDEX: {
-        return BCLog::LogFlags::REINDEX;
-    }
-    case btck_LogCategory_VALIDATION: {
-        return BCLog::LogFlags::VALIDATION;
-    }
-    case btck_LogCategory_KERNEL: {
-        return BCLog::LogFlags::KERNEL;
-    }
-    case btck_LogCategory_ALL: {
-        return BCLog::LogFlags::ALL;
-    }
-    }
-    assert(false);
 }
 
 btck_SynchronizationState cast_state(SynchronizationState state)
@@ -226,47 +192,44 @@ btck_Warning cast_btck_warning(kernel::Warning warning)
 }
 
 struct LoggingConnection {
-    std::unique_ptr<std::list<std::function<void(const std::string&)>>::iterator> m_connection;
+    util::log::Logger::CallbackHandle m_callback_handle;
     void* m_user_data;
     std::function<void(void* user_data)> m_deleter;
 
     LoggingConnection(btck_LogCallback callback, void* user_data, btck_DestroyCallback user_data_destroy_callback)
+        : m_user_data{user_data}, m_deleter{user_data_destroy_callback}
     {
-        LOCK(cs_main);
+        m_callback_handle = util::log::GetLogger().RegisterCallback([callback, user_data](const util::log::Entry& entry) {
+            const auto timestamp_ns{Ticks<std::chrono::nanoseconds>(entry.timestamp.time_since_epoch())};
+            const auto file_name{std::string_view{entry.source_loc.file_name()}};
+            const auto function_name{std::string_view{entry.source_loc.function_name()}};
 
-        auto connection{LogInstance().PushBackCallback([callback, user_data](const std::string& str) { callback(user_data, str.c_str(), str.length()); })};
+            btck_LogEntry btck_entry{
+                .message = entry.message.c_str(),
+                .message_len = entry.message.size(),
+                .file_name = file_name.data(),
+                .file_name_len = file_name.size(),
+                .function_name = function_name.data(),
+                .function_name_len = function_name.size(),
+                .thread_name = entry.thread_name.c_str(),
+                .thread_name_len = entry.thread_name.size(),
+                .timestamp_ns = timestamp_ns,
+                .line = entry.source_loc.line(),
+                .level = static_cast<btck_LogLevel>(entry.level),
+                .category = to_btck_category(static_cast<BCLog::LogFlags>(entry.category)),
+            };
 
-        // Only start logging if we just added the connection.
-        if (LogInstance().NumConnections() == 1 && !LogInstance().StartLogging()) {
-            LogError("Logger start failed.");
-            LogInstance().DeleteCallback(connection);
-            if (user_data && user_data_destroy_callback) {
-                user_data_destroy_callback(user_data);
-            }
-            throw std::runtime_error("Failed to start logging");
-        }
-
-        m_connection = std::make_unique<std::list<std::function<void(const std::string&)>>::iterator>(connection);
-        m_user_data = user_data;
-        m_deleter = user_data_destroy_callback;
+            callback(user_data, &btck_entry);
+        });
 
         LogDebug(BCLog::KERNEL, "Logger connected.");
     }
 
     ~LoggingConnection()
     {
-        LOCK(cs_main);
         LogDebug(BCLog::KERNEL, "Logger disconnecting.");
+        util::log::GetLogger().UnregisterCallback(m_callback_handle);
 
-        // Switch back to buffering by calling DisconnectTestLogger if the
-        // connection that we are about to remove is the last one.
-        if (LogInstance().NumConnections() == 1) {
-            LogInstance().DisconnectTestLogger();
-        } else {
-            LogInstance().DeleteCallback(*m_connection);
-        }
-
-        m_connection.reset();
         if (m_user_data && m_deleter) {
             m_deleter(m_user_data);
         }
@@ -706,39 +669,9 @@ void btck_txid_destroy(btck_Txid* txid)
     delete txid;
 }
 
-void btck_logging_set_options(const btck_LoggingOptions options)
+void btck_logging_set_min_level(btck_LogLevel level)
 {
-    LOCK(cs_main);
-    LogInstance().m_log_timestamps = options.log_timestamps;
-    LogInstance().m_log_time_micros = options.log_time_micros;
-    LogInstance().m_log_threadnames = options.log_threadnames;
-    LogInstance().m_log_sourcelocations = options.log_sourcelocations;
-    LogInstance().m_always_print_category_level = options.always_print_category_levels;
-}
-
-void btck_logging_set_level_category(btck_LogCategory category, btck_LogLevel level)
-{
-    LOCK(cs_main);
-    if (category == btck_LogCategory_ALL) {
-        LogInstance().SetLogLevel(get_bclog_level(level));
-    }
-
-    LogInstance().AddCategoryLogLevel(get_bclog_flag(category), get_bclog_level(level));
-}
-
-void btck_logging_enable_category(btck_LogCategory category)
-{
-    LogInstance().EnableCategory(get_bclog_flag(category));
-}
-
-void btck_logging_disable_category(btck_LogCategory category)
-{
-    LogInstance().DisableCategory(get_bclog_flag(category));
-}
-
-void btck_logging_disable()
-{
-    LogInstance().DisableLogging();
+    util::log::GetLogger().SetMinLevel(static_cast<util::log::Level>(level));
 }
 
 btck_LoggingConnection* btck_logging_connection_create(btck_LogCallback callback, void* user_data, btck_DestroyCallback user_data_destroy_callback)

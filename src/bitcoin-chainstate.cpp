@@ -31,9 +31,9 @@ std::vector<std::byte> hex_string_to_byte_vec(std::string_view hex)
 class KernelLog
 {
 public:
-    void LogMessage(std::string_view message)
+    void LogMessage(const btck_LogEntry& entry)
     {
-        std::cout << "kernel: " << message;
+        std::cout << "kernel: " << std::string_view{entry.message, entry.message_len} << "\n";
     }
 };
 
@@ -142,16 +142,6 @@ int main(int argc, char* argv[])
     }
     std::filesystem::path abs_datadir{std::filesystem::absolute(argv[1])};
     std::filesystem::create_directories(abs_datadir);
-
-    btck_LoggingOptions logging_options = {
-        .log_timestamps = true,
-        .log_time_micros = false,
-        .log_threadnames = false,
-        .log_sourcelocations = false,
-        .always_print_category_levels = true,
-    };
-
-    logging_set_options(logging_options);
 
     Logger logger{std::make_unique<KernelLog>()};
 
