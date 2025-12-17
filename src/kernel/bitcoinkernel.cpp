@@ -495,6 +495,10 @@ struct btck_TransactionInput : Handle<btck_TransactionInput, CTxIn> {};
 struct btck_TransactionOutPoint: Handle<btck_TransactionOutPoint, COutPoint> {};
 struct btck_Txid: Handle<btck_Txid, Txid> {};
 
+struct btck_ScriptVerifyResult {
+    bool is_valid;
+};
+
 btck_Transaction* btck_transaction_create(const void* raw_transaction, size_t raw_transaction_len)
 {
     if (raw_transaction == nullptr && raw_transaction_len != 0) {
@@ -607,25 +611,26 @@ void btck_transaction_output_destroy(btck_TransactionOutput* output)
     delete output;
 }
 
-int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
-                              const int64_t amount,
-                              const btck_Transaction* tx_to,
-                              const btck_TransactionOutput** spent_outputs_, size_t spent_outputs_len,
-                              const unsigned int input_index,
-                              const btck_ScriptVerificationFlags flags,
-                              btck_ScriptVerifyStatus* status)
+btck_ScriptVerifyResult* btck_script_pubkey_verify(
+    const btck_ScriptPubkey* script_pubkey,
+    const int64_t amount,
+    const btck_Transaction* tx_to,
+    const btck_TransactionOutput** spent_outputs_, size_t spent_outputs_len,
+    const unsigned int input_index,
+    const btck_ScriptVerificationFlags flags,
+    btck_ScriptVerifyStatus* status)
 {
     // Assert that all specified flags are part of the interface before continuing
     assert((flags & ~btck_ScriptVerificationFlags_ALL) == 0);
 
     if (!is_valid_flag_combination(script_verify_flags::from_int(flags))) {
         if (status) *status = btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION;
-        return 0;
+        return nullptr;
     }
 
     if (flags & btck_ScriptVerificationFlags_TAPROOT && spent_outputs_ == nullptr) {
         if (status) *status = btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED;
-        return 0;
+        return nullptr;
     }
 
     if (status) *status = btck_ScriptVerifyStatus_OK;
@@ -654,7 +659,18 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
                                script_verify_flags::from_int(flags),
                                TransactionSignatureChecker(&tx, input_index, amount, txdata, MissingDataBehavior::FAIL),
                                nullptr);
-    return result ? 1 : 0;
+
+    return new btck_ScriptVerifyResult{result};
+}
+
+int btck_script_verify_result_is_valid(const btck_ScriptVerifyResult* result)
+{
+    return result->is_valid ? 1 : 0;
+}
+
+void btck_script_verify_result_destroy(btck_ScriptVerifyResult* result)
+{
+    delete result;
 }
 
 btck_TransactionInput* btck_transaction_input_copy(const btck_TransactionInput* input)

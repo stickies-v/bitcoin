@@ -284,6 +284,16 @@ typedef struct btck_TransactionOutPoint btck_TransactionOutPoint;
 
 typedef struct btck_Txid btck_Txid;
 
+/**
+ * Opaque data structure for holding the result of a script verification.
+ *
+ * This object is returned by @ref btck_script_pubkey_verify and represents
+ * a successful execution of the verification logic. If the verification
+ * could not be performed (e.g., due to invalid parameters), the verify
+ * function returns NULL instead of this object.
+ */
+typedef struct btck_ScriptVerifyResult btck_ScriptVerifyResult;
+
 /** Current sync state passed to tip changed callbacks. */
 typedef uint8_t btck_SynchronizationState;
 #define btck_SynchronizationState_INIT_REINDEX ((btck_SynchronizationState)(0))
@@ -610,10 +620,12 @@ BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_scrip
  * @param[in] spent_outputs_len Length of the spent_outputs array.
  * @param[in] input_index       Index of the input in tx_to spending the script_pubkey.
  * @param[in] flags             Bitfield of btck_ScriptVerificationFlags controlling validation constraints.
- * @param[out] status           Nullable, will be set to an error code if the operation fails, or OK otherwise.
- * @return                      1 if the script is valid, 0 otherwise.
+ * @param[out] status           Nullable, will be set to an error code if the function returns NULL,
+ *                              or OK if a result object is returned.
+ * @return                      A result object if verification was performed, or NULL if parameters
+ *                              were invalid (check status for details).
  */
-BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_verify(
+BITCOINKERNEL_API btck_ScriptVerifyResult* BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_verify(
     const btck_ScriptPubkey* script_pubkey,
     int64_t amount,
     const btck_Transaction* tx_to,
@@ -621,6 +633,20 @@ BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_verify
     unsigned int input_index,
     btck_ScriptVerificationFlags flags,
     btck_ScriptVerifyStatus* status) BITCOINKERNEL_ARG_NONNULL(1, 3);
+
+/**
+ * @brief Check if the verified script is valid.
+ *
+ * @param[in] result Non-null, result object from @ref btck_script_pubkey_verify.
+ * @return           1 if the script is valid, 0 if the script is invalid.
+ */
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_verify_result_is_valid(
+    const btck_ScriptVerifyResult* result) BITCOINKERNEL_ARG_NONNULL(1);
+
+/**
+ * Destroy the script verification result.
+ */
+BITCOINKERNEL_API void btck_script_verify_result_destroy(btck_ScriptVerifyResult* result);
 
 /**
  * @brief Serializes the script pubkey through the passed in callback to bytes.

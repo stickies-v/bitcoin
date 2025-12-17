@@ -367,6 +367,22 @@ public:
     const CType* get() const { return m_ptr.get(); }
 };
 
+class ScriptVerifyResult : public UniqueHandle<btck_ScriptVerifyResult, btck_script_verify_result_destroy>
+{
+public:
+    explicit ScriptVerifyResult(btck_ScriptVerifyResult* ptr) : UniqueHandle{ptr} {}
+
+    bool IsValid() const
+    {
+        return btck_script_verify_result_is_valid(get()) == 1;
+    }
+
+    explicit operator bool() const
+    {
+        return IsValid();
+    }
+};
+
 class Transaction;
 class TransactionOutput;
 
@@ -383,12 +399,13 @@ private:
     ScriptPubkeyApi() = default;
 
 public:
-    bool Verify(int64_t amount,
-                const Transaction& tx_to,
-                std::span<const TransactionOutput> spent_outputs,
-                unsigned int input_index,
-                ScriptVerificationFlags flags,
-                ScriptVerifyStatus& status) const;
+    std::optional<ScriptVerifyResult> Verify(
+        int64_t amount,
+        const Transaction& tx_to,
+        std::span<const TransactionOutput> spent_outputs,
+        unsigned int input_index,
+        ScriptVerificationFlags flags,
+        ScriptVerifyStatus& status) const;
 
     std::vector<std::byte> ToBytes() const
     {
@@ -627,12 +644,13 @@ public:
 };
 
 template <typename Derived>
-bool ScriptPubkeyApi<Derived>::Verify(int64_t amount,
-                                      const Transaction& tx_to,
-                                      const std::span<const TransactionOutput> spent_outputs,
-                                      unsigned int input_index,
-                                      ScriptVerificationFlags flags,
-                                      ScriptVerifyStatus& status) const
+std::optional<ScriptVerifyResult> ScriptPubkeyApi<Derived>::Verify(
+    int64_t amount,
+    const Transaction& tx_to,
+    const std::span<const TransactionOutput> spent_outputs,
+    unsigned int input_index,
+    ScriptVerificationFlags flags,
+    ScriptVerifyStatus& status) const
 {
     const btck_TransactionOutput** spent_outputs_ptr = nullptr;
     std::vector<const btck_TransactionOutput*> raw_spent_outputs;
@@ -652,7 +670,10 @@ bool ScriptPubkeyApi<Derived>::Verify(int64_t amount,
         input_index,
         static_cast<btck_ScriptVerificationFlags>(flags),
         reinterpret_cast<btck_ScriptVerifyStatus*>(&status));
-    return result == 1;
+    if (!result) {
+        return std::nullopt;
+    }
+    return ScriptVerifyResult{result};
 }
 
 template <typename Derived>

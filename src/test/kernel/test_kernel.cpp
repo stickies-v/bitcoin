@@ -226,41 +226,48 @@ void run_verify_test(
     auto status = ScriptVerifyStatus::OK;
 
     if (taproot) {
-        BOOST_CHECK(spent_script_pubkey.Verify(
+        auto result = spent_script_pubkey.Verify(
             amount,
             spending_tx,
             spent_outputs,
             input_index,
             ScriptVerificationFlags::ALL,
-            status));
+            status);
+        BOOST_CHECK(result.has_value());
+        BOOST_CHECK(result->IsValid());
         BOOST_CHECK(status == ScriptVerifyStatus::OK);
     } else {
-        BOOST_CHECK(!spent_script_pubkey.Verify(
+        auto result = spent_script_pubkey.Verify(
             amount,
             spending_tx,
             spent_outputs,
             input_index,
             ScriptVerificationFlags::ALL,
-            status));
+            status);
+        BOOST_CHECK(!result.has_value());
         BOOST_CHECK(status == ScriptVerifyStatus::ERROR_SPENT_OUTPUTS_REQUIRED);
     }
 
-    BOOST_CHECK(spent_script_pubkey.Verify(
+    auto result_pre_taproot = spent_script_pubkey.Verify(
         amount,
         spending_tx,
         spent_outputs,
         input_index,
         VERIFY_ALL_PRE_TAPROOT,
-        status));
+        status);
+    BOOST_CHECK(result_pre_taproot.has_value());
+    BOOST_CHECK(result_pre_taproot->IsValid());
     BOOST_CHECK(status == ScriptVerifyStatus::OK);
 
-    BOOST_CHECK(spent_script_pubkey.Verify(
+    auto result_pre_segwit = spent_script_pubkey.Verify(
         0,
         spending_tx,
         spent_outputs,
         input_index,
         VERIFY_ALL_PRE_SEGWIT,
-        status));
+        status);
+    BOOST_CHECK(result_pre_segwit.has_value());
+    BOOST_CHECK(result_pre_segwit->IsValid());
     BOOST_CHECK(status == ScriptVerifyStatus::OK);
 }
 
@@ -955,7 +962,9 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
             BOOST_CHECK(inputs.size() == spent_outputs.size());
             ScriptVerifyStatus status = ScriptVerifyStatus::OK;
             for (size_t i{0}; i < inputs.size(); ++i) {
-                BOOST_CHECK(spent_outputs[i].GetScriptPubkey().Verify(spent_outputs[i].Amount(), transaction, spent_outputs, i, ScriptVerificationFlags::ALL, status));
+                auto result = spent_outputs[i].GetScriptPubkey().Verify(spent_outputs[i].Amount(), transaction, spent_outputs, i, ScriptVerificationFlags::ALL, status);
+                BOOST_CHECK(result.has_value());
+                BOOST_CHECK(result->IsValid());
             }
         }
     }
