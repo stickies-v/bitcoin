@@ -106,24 +106,26 @@ class ChainTiebreaksTest(BitcoinTestFramework):
         node = self.nodes[0]
         peer = node.add_p2p_connection(P2PDataStore())
 
+        self.generate(node, 1, sync_fun=self.no_op)
+
         self.log.info('Precomputing blocks')
         #
-        #      A1
-        #     /
-        #   G
-        #     \
-        #      A2
+        #            /- A1
+        #           /
+        #   G -- B1 --- A2
+        #           \
+        #            \- A3
         #
         blocks = []
 
-        # Construct two blocks building from genesis.
+        # Construct three equal-work blocks building from the tip.
         start_height = node.getblockcount()
-        genesis_block = node.getblock(node.getblockhash(start_height))
-        prev_time = genesis_block["time"]
+        tip_block = node.getblock(node.getbestblockhash())
+        prev_time = tip_block["time"]
 
-        for i in range(0, 2):
+        for i in range(0, 3):
             blocks.append(create_block(
-                hashprev=int(genesis_block["hash"], 16),
+                hashprev=int(tip_block["hash"], 16),
                 tmpl={"height": start_height + 1,
                 # Make sure each block has a different hash.
                 "curtime": prev_time + i + 1,
@@ -131,16 +133,24 @@ class ChainTiebreaksTest(BitcoinTestFramework):
             ))
             blocks[-1].solve()
 
-        # Send blocks and test the last one is not connected
-        self.log.info('Send A1 and A2. Make sure that only the former connects')
+        # Send blocks and test that only the first one connects
+        self.log.info('Send A1, A2, and A3. Make sure that only the former connects')
         peer.send_blocks_and_test([blocks[0]], node, success=True)
         peer.send_blocks_and_test([blocks[1]], node, success=False)
+        peer.send_blocks_and_test([blocks[2]], node, success=False)
 
-        self.log.info('Restart the node and check that the best tip before restarting matched the ones afterwards')
-        # Restart and check enough times for this to eventually fail if the logic is broken
-        for _ in range(10):
-            self.restart_node(0)
-            assert_equal(blocks[0].hash_hex, node.getbestblockhash())
+        # Restart and send a new block
+        self.restart_node(0)
+        assert_equal(blocks[0].hash_hex, node.getbestblockhash())
+        peer = node.add_p2p_connection(P2PDataStore())
+        next_block = create_block(
+            hashprev=blocks[0].hash_int,
+            tmpl={"height": start_height + 2,
+            "curtime": prev_time + 10,
+            }
+        )
+        next_block.solve()
+        peer.send_blocks_and_test([next_block], node, success=True)
 
     def run_test(self):
         self.test_chain_split_in_memory()
