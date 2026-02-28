@@ -3152,14 +3152,20 @@ CBlockIndex* Chainstate::FindMostWorkChain()
 {
     AssertLockHeld(::cs_main);
     do {
-        CBlockIndex *pindexNew = nullptr;
+        CBlockIndex* pindexNew = nullptr;
 
         // Find the best candidate header.
+        if (setBlockIndexCandidates.empty()) return nullptr;
         {
-            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
-            if (it == setBlockIndexCandidates.rend())
-                return nullptr;
-            pindexNew = *it;
+            pindexNew = *setBlockIndexCandidates.rbegin();
+            // The set is sorted by nChainWork only. Among equal-work entries,
+            // pick the best using the full comparator (which includes nSequenceId).
+            for (auto it{std::next(setBlockIndexCandidates.rbegin())};
+                 it != setBlockIndexCandidates.rend() && (*it)->nChainWork == pindexNew->nChainWork; ++it) {
+                if (CBlockIndexWorkComparator()(pindexNew, *it)) {
+                    pindexNew = *it;
+                }
+            }
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
@@ -3211,9 +3217,9 @@ CBlockIndex* Chainstate::FindMostWorkChain()
 void Chainstate::PruneBlockIndexCandidates() {
     // Note that we can't delete the current block itself, as we may need to return to it later in case a
     // reorganization to a better block fails.
-    std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
-    while (it != setBlockIndexCandidates.end() && CBlockIndexWorkComparator()(*it, m_chain.Tip())) {
-        setBlockIndexCandidates.erase(it++);
+    for (auto it{setBlockIndexCandidates.begin()}; it != setBlockIndexCandidates.end() &&
+                                                   (*it)->nChainWork <= m_chain.Tip()->nChainWork;) {
+        CBlockIndexWorkComparator()(*it, m_chain.Tip()) ? setBlockIndexCandidates.erase(it++) : ++it;
     }
     // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
     assert(!setBlockIndexCandidates.empty());

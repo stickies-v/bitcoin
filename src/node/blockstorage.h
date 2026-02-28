@@ -134,7 +134,14 @@ static constexpr uint32_t UNDO_DATA_DISK_OVERHEAD{STORAGE_HEADER_BYTES + uint256
 // containers), or make the key a `std::unique_ptr<CBlockIndex>`
 using BlockMap = std::unordered_map<uint256, CBlockIndex, BlockHasher>;
 
+//! Compare blocks by nChainWork, nSequenceId and memory address
 struct CBlockIndexWorkComparator {
+    bool operator()(const CBlockIndex* pa, const CBlockIndex* pb) const;
+    using is_transparent = void;
+};
+
+//! Compare blocks by nChainWork and memory address
+struct BlockWorkComparator {
     bool operator()(const CBlockIndex* pa, const CBlockIndex* pb) const;
     using is_transparent = void;
 };
