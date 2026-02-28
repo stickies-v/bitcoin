@@ -3539,7 +3539,6 @@ bool Chainstate::PreciousBlock(BlockValidationState& state, CBlockIndex* pindex)
             m_chainman.nBlockReverseSequenceId = -1;
         }
         m_chainman.nLastPreciousChainwork = m_chain.Tip()->nChainWork;
-        setBlockIndexCandidates.erase(pindex);
         pindex->nSequenceId = m_chainman.nBlockReverseSequenceId;
         if (m_chainman.nBlockReverseSequenceId > std::numeric_limits<int32_t>::min()) {
             // We can't keep reducing the counter if somebody really wants to
