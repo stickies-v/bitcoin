@@ -3156,10 +3156,10 @@ CBlockIndex* Chainstate::FindMostWorkChain()
 
         // Find the best candidate header.
         {
-            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
-            if (it == setBlockIndexCandidates.rend())
+            if (setBlockIndexCandidates.empty())
                 return nullptr;
-            pindexNew = *it;
+            pindexNew = *std::max_element(setBlockIndexCandidates.begin(), setBlockIndexCandidates.end(),
+                                          CBlockIndexWorkComparator());
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
@@ -3211,10 +3211,9 @@ CBlockIndex* Chainstate::FindMostWorkChain()
 void Chainstate::PruneBlockIndexCandidates() {
     // Note that we can't delete the current block itself, as we may need to return to it later in case a
     // reorganization to a better block fails.
-    std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
-    while (it != setBlockIndexCandidates.end() && CBlockIndexWorkComparator()(*it, m_chain.Tip())) {
-        setBlockIndexCandidates.erase(it++);
-    }
+    std::erase_if(setBlockIndexCandidates, [tip = m_chain.Tip()](CBlockIndex* candidate) {
+        return CBlockIndexWorkComparator()(candidate, tip);
+    });
     // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
     assert(!setBlockIndexCandidates.empty());
 }

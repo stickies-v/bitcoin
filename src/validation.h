@@ -679,7 +679,7 @@ public:
      * genesis block or an assumeutxo snapshot block). Entries may be failed,
      * though, and pruning nodes may be missing the data for the block.
      */
-    std::set<CBlockIndex*, node::CBlockIndexWorkComparator> setBlockIndexCandidates;
+    std::set<CBlockIndex*, std::less<>> setBlockIndexCandidates;
 
     //! @returns A reference to the in-memory cache of the UTXO set.
     CCoinsViewCache& CoinsTip() EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
