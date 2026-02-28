@@ -3212,7 +3212,7 @@ void Chainstate::PruneBlockIndexCandidates() {
     // Note that we can't delete the current block itself, as we may need to return to it later in case a
     // reorganization to a better block fails.
     std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
-    while (it != setBlockIndexCandidates.end() && setBlockIndexCandidates.value_comp()(*it, m_chain.Tip())) {
+    while (it != setBlockIndexCandidates.end() && CBlockIndexWorkComparator()(*it, m_chain.Tip())) {
         setBlockIndexCandidates.erase(it++);
     }
     // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
@@ -3703,7 +3703,7 @@ bool Chainstate::InvalidateBlock(BlockValidationState& state, CBlockIndex* pinde
         // Loop back over all block index entries and add any missing entries
         // to setBlockIndexCandidates.
         for (auto& [_, block_index] : m_blockman.m_block_index) {
-            if (block_index.IsValid(BLOCK_VALID_TRANSACTIONS) && block_index.HaveNumChainTxs() && !setBlockIndexCandidates.value_comp()(&block_index, m_chain.Tip())) {
+            if (block_index.IsValid(BLOCK_VALID_TRANSACTIONS) && block_index.HaveNumChainTxs() && !CBlockIndexWorkComparator()(&block_index, m_chain.Tip())) {
                 setBlockIndexCandidates.insert(&block_index);
             }
         }
@@ -3756,7 +3756,7 @@ void Chainstate::ResetBlockFailureFlags(CBlockIndex *pindex) {
         if ((block_index.nStatus & BLOCK_FAILED_VALID) && (block_index.GetAncestor(nHeight) == pindex || pindex->GetAncestor(block_index.nHeight) == &block_index)) {
             block_index.nStatus &= ~BLOCK_FAILED_VALID;
             m_blockman.m_dirty_blockindex.insert(&block_index);
-            if (block_index.IsValid(BLOCK_VALID_TRANSACTIONS) && block_index.HaveNumChainTxs() && setBlockIndexCandidates.value_comp()(m_chain.Tip(), &block_index)) {
+            if (block_index.IsValid(BLOCK_VALID_TRANSACTIONS) && block_index.HaveNumChainTxs() && CBlockIndexWorkComparator()(m_chain.Tip(), &block_index)) {
                 setBlockIndexCandidates.insert(&block_index);
             }
             if (&block_index == m_chainman.m_best_invalid) {
@@ -3781,7 +3781,7 @@ void Chainstate::TryAddBlockIndexCandidate(CBlockIndex* pindex)
 
     // The block only is a candidate for the most-work-chain if it has the same
     // or more work than our current tip.
-    if (m_chain.Tip() != nullptr && setBlockIndexCandidates.value_comp()(pindex, m_chain.Tip())) {
+    if (m_chain.Tip() != nullptr && CBlockIndexWorkComparator()(pindex, m_chain.Tip())) {
         return;
     }
 
