@@ -6,15 +6,13 @@
 #ifndef BITCOIN_SYNC_H
 #define BITCOIN_SYNC_H
 
-#ifdef DEBUG_LOCKCONTENTION
-#include <logging/timer.h>
-#endif
-
 #include <threadsafety.h> // IWYU pragma: export
 #include <util/macros.h>
 
+#include <atomic>
 #include <cassert>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -76,6 +74,12 @@ void AssertLockNotHeldInternal(const char* pszName, const char* pszFile, int nLi
 inline void DeleteLock(void* cs) {}
 inline bool LockStackEmpty() { return true; }
 #endif
+
+/** Type-erased RAII guard, destroyed via the provided function pointer deleter. */
+using ContentionGuard = std::unique_ptr<void, void (*)(void*)>;
+using ContentionHandler = ContentionGuard (*)(const char* name, const char* file, int line);
+/** Optional callback invoked on lock contention. No-op by default. */
+extern std::atomic<ContentionHandler> g_on_lock_contention;
 
 /**
  * Template mixin that adds -Wthread-safety locking annotations and lock order
@@ -152,7 +156,10 @@ private:
         EnterCritical(pszName, pszFile, nLine, Base::mutex());
 #ifdef DEBUG_LOCKCONTENTION
         if (Base::try_lock()) return;
-        LOG_TIME_MICROS_WITH_CATEGORY(strprintf("lock contention %s, %s:%d", pszName, pszFile, nLine), BCLog::LOCK);
+        auto handler{g_on_lock_contention.load(std::memory_order_relaxed)};
+        // Guard must outlive lock() so its destructor can measure wait time.
+        auto contention_guard{handler ? handler(pszName, pszFile, nLine) : ContentionGuard { nullptr,
+                                                                                             nullptr }};
 #endif
         Base::lock();
     }

@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+std::atomic<ContentionHandler> g_on_lock_contention{nullptr};
+
 #ifdef DEBUG_LOCKORDER
 //
 // Early deadlock detection.

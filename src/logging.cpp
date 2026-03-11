@@ -4,7 +4,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <logging.h>
+
+#include <logging/timer.h>
 #include <memusage.h>
+#include <sync.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/string.h>
@@ -615,3 +618,24 @@ void util::log::Log(util::log::Entry entry)
         logger.LogPrintStr(std::move(entry.message), std::move(entry.source_loc), static_cast<BCLog::LogFlags>(entry.category), entry.level, entry.should_ratelimit);
     }
 }
+
+#ifdef DEBUG_LOCKCONTENTION
+/** Registers g_on_lock_contention to log contention duration via BCLog::Timer. */
+static struct LockContentionLogger {
+    LockContentionLogger()
+    {
+        assert(!g_on_lock_contention.load());
+        g_on_lock_contention.store([](const char* name, const char* file, int line) -> ContentionGuard {
+            auto* timer = new BCLog::Timer<std::chrono::microseconds>(
+                __func__, strprintf("lock contention %s, %s:%d", name, file, line), BCLog::LOCK);
+            return ContentionGuard{timer, [](void* p) {
+                                       delete static_cast<decltype(timer)>(p);
+                                   }};
+        });
+    }
+    ~LockContentionLogger()
+    {
+        g_on_lock_contention.store(nullptr);
+    }
+} g_lock_contention_logger;
+#endif
