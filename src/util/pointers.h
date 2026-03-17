@@ -1,3 +1,25 @@
+// Copyright (c) The Bitcoin Core developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://opensource.org/license/mit/.
+
+// This file is based on
+// https://github.com/microsoft/GSL/blob/main/include/gsl/pointers,
+// with some modifications:
+// * Remove everything around GSL_DEPRECATED and GSL_NO_IOSTREAMS, because it
+//   is not needed.
+// * Use the Assert from util/check.h to reject nullptr at runtime.
+// * Rename the namespace gsl to gsl_detail, so that anything used is exported
+//   following the symbol naming convention in doc/developer-notes.md.
+//   This will also "hide":
+//    - not_null and make_not_null, because only strict_not_null is needed.
+//    - owner, because it is not needed.
+//    - strict_make_not_null, because it is not needed.
+// * Remove the not_null->strict_not_null converting constructors, because they
+//   are not needed.
+// * Add util namespace for aliases to be used by Bitcoin Core code.
+//
+// All original code is covered by:
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (c) 2015 Microsoft Corporation. All rights reserved.
@@ -14,11 +36,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef GSL_POINTERS_H
-#define GSL_POINTERS_H
+#ifndef BITCOIN_UTIL_POINTERS_H
+#define BITCOIN_UTIL_POINTERS_H
 
-#include "./assert" // for Ensures, Expects
-#include "./util"   // for GSL_DEPRECATED
+#include <util/check.h>
 
 #include <cstddef>     // for ptrdiff_t, nullptr_t, size_t
 #include <functional>  // for less, greater
@@ -26,11 +47,7 @@
 #include <type_traits> // for enable_if_t, is_convertible, is_assignable
 #include <utility>     // for declval, forward
 
-#if !defined(GSL_NO_IOSTREAMS)
-#include <iosfwd> // for ostream
-#endif            // !defined(GSL_NO_IOSTREAMS)
-
-namespace gsl
+namespace gsl_detail
 {
 
 namespace details
@@ -60,15 +77,6 @@ namespace details
                            const T, const T&>;
 
 } // namespace details
-
-//
-// GSL.owner: ownership pointers
-//
-template <typename... Ts>
-using shared_ptr GSL_DEPRECATED("Use std::shared_ptr instead") = std::shared_ptr<Ts...>;
-
-template <typename... Ts>
-using unique_ptr GSL_DEPRECATED("Use std::unique_ptr instead") = std::unique_ptr<Ts...>;
 
 //
 // owner
@@ -110,14 +118,14 @@ public:
     constexpr not_null(U&& u) noexcept(std::is_nothrow_move_constructible<T>::value)
         : ptr_(std::forward<U>(u))
     {
-        Expects(ptr_ != nullptr);
+        Assert(ptr_ != nullptr);
     }
 
     template <typename = std::enable_if_t<!std::is_same<std::nullptr_t, T>::value>>
     constexpr not_null(T u) noexcept(std::is_nothrow_move_constructible<T>::value)
         : ptr_(std::move(u))
     {
-        Expects(ptr_ != nullptr);
+        Assert(ptr_ != nullptr);
     }
 
     template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
@@ -170,15 +178,6 @@ auto make_not_null(T&& t) noexcept
 {
     return not_null<std::remove_cv_t<std::remove_reference_t<T>>>{std::forward<T>(t)};
 }
-
-#if !defined(GSL_NO_IOSTREAMS)
-template <class T>
-std::ostream& operator<<(std::ostream& os, const not_null<T>& val)
-{
-    os << val.get();
-    return os;
-}
-#endif // !defined(GSL_NO_IOSTREAMS)
 
 template <class T, class U>
 constexpr auto operator==(const not_null<T>& lhs,
@@ -257,18 +256,18 @@ struct not_null_hash<T, U, false>
     not_null_hash& operator=(const not_null_hash&) = delete;
 };
 
-} // namespace gsl
+} // namespace gsl_detail
 
 namespace std
 {
 template <class T>
-struct hash<gsl::not_null<T>> : gsl::not_null_hash<gsl::not_null<T>>
+struct hash<gsl_detail::not_null<T>> : gsl_detail::not_null_hash<gsl_detail::not_null<T>>
 {
 };
 
 } // namespace std
 
-namespace gsl
+namespace gsl_detail
 {
 
 //
@@ -303,12 +302,6 @@ public:
     {}
 
     template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr strict_not_null(const not_null<U>& other) noexcept(
-        std::is_nothrow_move_constructible<T>::value)
-        : not_null<T>(other)
-    {}
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
     constexpr strict_not_null(const strict_not_null<U>& other) noexcept(
         std::is_nothrow_move_constructible<T>::value)
         : not_null<T>(other)
@@ -321,11 +314,6 @@ public:
         std::is_nothrow_copy_constructible<T>::value) = default;
     strict_not_null(const strict_not_null& other) = default;
     strict_not_null& operator=(const strict_not_null& other) = default;
-    strict_not_null& operator=(const not_null<T>& other)
-    {
-        not_null<T>::operator=(other);
-        return *this;
-    }
 
     // prevents compilation when someone attempts to assign a null pointer constant
     strict_not_null(std::nullptr_t) = delete;
@@ -367,15 +355,59 @@ strict_not_null(T) -> strict_not_null<T>;
 
 #endif // ( defined(__cpp_deduction_guides) && (__cpp_deduction_guides >= 201611L) )
 
-} // namespace gsl
+} // namespace gsl_detail
 
 namespace std
 {
 template <class T>
-struct hash<gsl::strict_not_null<T>> : gsl::not_null_hash<gsl::strict_not_null<T>>
+struct hash<gsl_detail::strict_not_null<T>> : gsl_detail::not_null_hash<gsl_detail::strict_not_null<T>>
 {
 };
 
 } // namespace std
 
-#endif // GSL_POINTERS_H
+namespace util {
+
+/// NotNull is intended to be used to denote that a smart pointer type can not
+/// hold a nullptr value.
+///
+/// The type is more useful, the earlier in the lifetime of a pointer it is
+/// used. So instead of passing an existing pointer into NotNull, it is
+/// recommended to use the type when creating the smart pointer. E.g.:
+///
+/// util::NotNull p{std::make_shared<Thing>()};
+///
+/// NotNull should *not* be used to denote a raw pointer can not be nullptr.
+/// The C++ language provides raw references for this use case, and the C++
+/// standard library provides std::reference_wrapper, where raw references can
+/// not be used.
+///
+/// This type is currently not movable, meaning that the inner pointer must be
+/// copied for any move or copy operation, such that the moved-from pointer
+/// remains a valid NotNull pointer. Thus, NotNullUniquePtr can not be moved,
+/// because a unique pointer can not be copied.
+template <class T>
+struct NotNull : public gsl_detail::strict_not_null<T> {
+    using gsl_detail::strict_not_null<T>::strict_not_null;
+};
+template <typename T>
+NotNull(T) -> NotNull<T>;
+
+template <typename T, typename Deleter = std::default_delete<T>>
+using NotNullUniquePtr = NotNull<std::unique_ptr<T, Deleter>>;
+
+template <typename T>
+using NotNullSharedPtr = NotNull<std::shared_ptr<T>>;
+
+} // namespace util
+
+namespace std
+{
+template <class T>
+struct hash<util::NotNull<T>> : gsl_detail::not_null_hash<util::NotNull<T>>
+{
+};
+
+} // namespace std
+
+#endif // BITCOIN_UTIL_POINTERS_H
