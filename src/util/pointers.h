@@ -16,6 +16,7 @@
 //    - strict_make_not_null, because it is not needed.
 // * Remove the not_null->strict_not_null converting constructors, because they
 //   are not needed.
+// * Add move constructors and getters.
 // * Add util namespace for aliases to be used by Bitcoin Core code.
 //
 // All original code is covered by:
@@ -134,15 +135,24 @@ public:
         : not_null(other.get())
     {}
 
-    not_null(const not_null& other) = default;
-    not_null& operator=(const not_null& other) = default;
-    constexpr details::value_or_reference_return_t<T> get() const
+    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
+    constexpr not_null(not_null<U>&& other) noexcept(std::is_nothrow_move_constructible<T>::value) : ptr_(std::move(other.ptr_))
+    {}
+
+    constexpr not_null(const not_null& other) = default;
+    constexpr not_null& operator=(const not_null& other) = default;
+    constexpr not_null(not_null&& other) = default;
+    constexpr not_null& operator=(not_null&& other) = default;
+
+    constexpr details::value_or_reference_return_t<T> get() const &
         noexcept(noexcept(details::value_or_reference_return_t<T>(std::declval<T&>())))
     {
         return ptr_;
     }
+    constexpr T&& get() && noexcept { return std::move(ptr_); }
 
-    constexpr operator T() const { return get(); }
+    constexpr operator T() const & { return get(); }
+    constexpr operator T() && noexcept { return std::move(*this).get(); }
     constexpr decltype(auto) operator->() const { return get(); }
     constexpr decltype(auto) operator*() const { return *get(); }
 
@@ -162,6 +172,7 @@ public:
     void swap(not_null<T>& other) noexcept { std::swap(ptr_, other.ptr_); }
 
 private:
+    template <class U> friend class not_null;
     T ptr_;
 };
 
@@ -307,13 +318,14 @@ public:
         : not_null<T>(other)
     {}
 
-    // To avoid invalidating the "not null" invariant, the contained pointer is actually copied
-    // instead of moved. If it is a custom pointer, its constructor could in theory throw
-    // exceptions.
-    strict_not_null(strict_not_null&& other) noexcept(
-        std::is_nothrow_copy_constructible<T>::value) = default;
-    strict_not_null(const strict_not_null& other) = default;
-    strict_not_null& operator=(const strict_not_null& other) = default;
+    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
+    constexpr strict_not_null(strict_not_null<U>&& other) noexcept(std::is_nothrow_move_constructible<T>::value) : not_null<T>(std::move(other))
+    {}
+
+    constexpr strict_not_null(strict_not_null&& other) = default;
+    constexpr strict_not_null& operator=(strict_not_null&& other) = default;
+    constexpr strict_not_null(const strict_not_null& other) = default;
+    constexpr strict_not_null& operator=(const strict_not_null& other) = default;
 
     // prevents compilation when someone attempts to assign a null pointer constant
     strict_not_null(std::nullptr_t) = delete;
@@ -382,10 +394,9 @@ namespace util {
 /// standard library provides std::reference_wrapper, where raw references can
 /// not be used.
 ///
-/// This type is currently not movable, meaning that the inner pointer must be
-/// copied for any move or copy operation, such that the moved-from pointer
-/// remains a valid NotNull pointer. Thus, NotNullUniquePtr can not be moved,
-/// because a unique pointer can not be copied.
+/// This type is movable, meaning that the inner pointer *is* null after a
+/// move. Clang-tidy is used to enforce use-after-move violations, so that the
+/// null can never be observed.
 template <class T>
 struct NotNull : public gsl_detail::strict_not_null<T> {
     using gsl_detail::strict_not_null<T>::strict_not_null;
