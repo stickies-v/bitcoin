@@ -2,381 +2,17 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://opensource.org/license/mit/.
 
-// This file is based on
-// https://github.com/microsoft/GSL/blob/main/include/gsl/pointers,
-// with some modifications:
-// * Remove everything around GSL_DEPRECATED and GSL_NO_IOSTREAMS, because it
-//   is not needed.
-// * Use the Assert from util/check.h to reject nullptr at runtime.
-// * Rename the namespace gsl to gsl_detail, so that anything used is exported
-//   following the symbol naming convention in doc/developer-notes.md.
-//   This will also "hide":
-//    - not_null and make_not_null, because only strict_not_null is needed.
-//    - owner, because it is not needed.
-//    - strict_make_not_null, because it is not needed.
-// * Remove the not_null->strict_not_null converting constructors, because they
-//   are not needed.
-// * Add move constructors and getters.
-// * Add util namespace for aliases to be used by Bitcoin Core code.
-//
-// All original code is covered by:
-
-///////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2015 Microsoft Corporation. All rights reserved.
-//
-// This code is licensed under the MIT License (MIT).
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-//
-///////////////////////////////////////////////////////////////////////////////
-
 #ifndef BITCOIN_UTIL_POINTERS_H
 #define BITCOIN_UTIL_POINTERS_H
 
 #include <util/check.h>
 
-#include <cstddef>     // for ptrdiff_t, nullptr_t, size_t
-#include <functional>  // for less, greater
-#include <memory>      // for shared_ptr, unique_ptr, hash
-#include <type_traits> // for enable_if_t, is_convertible, is_assignable
-#include <utility>     // for declval, forward
-
-namespace gsl_detail
-{
-
-namespace details
-{
-    template <typename T, typename = void>
-    struct is_comparable_to_nullptr : std::false_type
-    {
-    };
-
-    template <typename T>
-    struct is_comparable_to_nullptr<
-        T,
-        std::enable_if_t<std::is_convertible<decltype(std::declval<T>() != nullptr), bool>::value>>
-        : std::true_type
-    {
-    };
-
-    // Resolves to the more efficient of `const T` or `const T&`, in the context of returning a
-    // const-qualified value of type T.
-    //
-    // Copied from cppfront's implementation of the CppCoreGuidelines F.16
-    // (https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in)
-    template <typename T>
-    using value_or_reference_return_t =
-        std::conditional_t<sizeof(T) <= 2 * sizeof(void*) &&
-                               std::is_trivially_copy_constructible<T>::value,
-                           const T, const T&>;
-
-} // namespace details
-
-//
-// owner
-//
-// `gsl::owner<T>` is designed as a safety mechanism for code that must deal directly with raw
-// pointers that own memory. Ideally such code should be restricted to the implementation of
-// low-level abstractions. `gsl::owner` can also be used as a stepping point in converting legacy
-// code to use more modern RAII constructs, such as smart pointers.
-//
-// T must be a pointer type
-// - disallow construction from any type other than pointer type
-//
-template <class T, std::enable_if_t<std::is_pointer<T>::value, bool> = true>
-using owner = T;
-
-//
-// not_null
-//
-// Restricts a pointer or smart pointer to only hold non-null values.
-//
-// Has zero size overhead over T.
-//
-// If T is a pointer (i.e. T == U*) then
-// - allow construction from U*
-// - disallow construction from nullptr_t
-// - disallow default construction
-// - ensure construction from null U* fails
-// - allow implicit conversion to U*
-//
-template <class T>
-class not_null
-{
-public:
-    static_assert(details::is_comparable_to_nullptr<T>::value, "T cannot be compared to nullptr.");
-
-    using element_type = T;
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr not_null(U&& u) noexcept(std::is_nothrow_move_constructible<T>::value)
-        : ptr_(std::forward<U>(u))
-    {
-        Assert(ptr_ != nullptr);
-    }
-
-    template <typename = std::enable_if_t<!std::is_same<std::nullptr_t, T>::value>>
-    constexpr not_null(T u) noexcept(std::is_nothrow_move_constructible<T>::value)
-        : ptr_(std::move(u))
-    {
-        Assert(ptr_ != nullptr);
-    }
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr not_null(const not_null<U>& other) noexcept(
-        std::is_nothrow_move_constructible<T>::value)
-        : not_null(other.get())
-    {}
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr not_null(not_null<U>&& other) noexcept(std::is_nothrow_move_constructible<T>::value) : ptr_(std::move(other.ptr_))
-    {}
-
-    constexpr not_null(const not_null& other) = default;
-    constexpr not_null& operator=(const not_null& other) = default;
-    constexpr not_null(not_null&& other) = default;
-    constexpr not_null& operator=(not_null&& other) = default;
-
-    constexpr details::value_or_reference_return_t<T> get() const &
-        noexcept(noexcept(details::value_or_reference_return_t<T>(std::declval<T&>())))
-    {
-        return ptr_;
-    }
-    constexpr T&& get() && noexcept { return std::move(ptr_); }
-
-    constexpr operator T() const & { return get(); }
-    constexpr operator T() && noexcept { return std::move(*this).get(); }
-    constexpr decltype(auto) operator->() const { return get(); }
-    constexpr decltype(auto) operator*() const { return *get(); }
-
-    // prevents compilation when someone attempts to assign a null pointer constant
-    not_null(std::nullptr_t) = delete;
-    not_null& operator=(std::nullptr_t) = delete;
-
-    // unwanted operators...pointers only point to single objects!
-    not_null& operator++() = delete;
-    not_null& operator--() = delete;
-    not_null operator++(int) = delete;
-    not_null operator--(int) = delete;
-    not_null& operator+=(std::ptrdiff_t) = delete;
-    not_null& operator-=(std::ptrdiff_t) = delete;
-    void operator[](std::ptrdiff_t) const = delete;
-
-    void swap(not_null<T>& other) noexcept { std::swap(ptr_, other.ptr_); }
-
-private:
-    template <class U> friend class not_null;
-    T ptr_;
-};
-
-template <typename T, std::enable_if_t<std::is_move_assignable<T>::value &&
-                                           std::is_move_constructible<T>::value,
-                                       bool> = true>
-void swap(not_null<T>& a, not_null<T>& b) noexcept
-{
-    a.swap(b);
-}
-
-template <class T>
-auto make_not_null(T&& t) noexcept
-{
-    return not_null<std::remove_cv_t<std::remove_reference_t<T>>>{std::forward<T>(t)};
-}
-
-template <class T, class U>
-constexpr auto operator==(const not_null<T>& lhs,
-                          const not_null<U>& rhs) noexcept(noexcept(lhs.get() == rhs.get()))
-    -> decltype(lhs.get() == rhs.get())
-{
-    return lhs.get() == rhs.get();
-}
-
-template <class T, class U>
-constexpr auto operator!=(const not_null<T>& lhs,
-                          const not_null<U>& rhs) noexcept(noexcept(lhs.get() != rhs.get()))
-    -> decltype(lhs.get() != rhs.get())
-{
-    return lhs.get() != rhs.get();
-}
-
-template <class T, class U>
-constexpr auto operator<(const not_null<T>& lhs, const not_null<U>& rhs) noexcept(
-    noexcept(std::less<>{}(lhs.get(), rhs.get()))) -> decltype(std::less<>{}(lhs.get(), rhs.get()))
-{
-    return std::less<>{}(lhs.get(), rhs.get());
-}
-
-template <class T, class U>
-constexpr auto
-operator<=(const not_null<T>& lhs,
-           const not_null<U>& rhs) noexcept(noexcept(std::less_equal<>{}(lhs.get(), rhs.get())))
-    -> decltype(std::less_equal<>{}(lhs.get(), rhs.get()))
-{
-    return std::less_equal<>{}(lhs.get(), rhs.get());
-}
-
-template <class T, class U>
-constexpr auto
-operator>(const not_null<T>& lhs,
-          const not_null<U>& rhs) noexcept(noexcept(std::greater<>{}(lhs.get(), rhs.get())))
-    -> decltype(std::greater<>{}(lhs.get(), rhs.get()))
-{
-    return std::greater<>{}(lhs.get(), rhs.get());
-}
-
-template <class T, class U>
-constexpr auto
-operator>=(const not_null<T>& lhs,
-           const not_null<U>& rhs) noexcept(noexcept(std::greater_equal<>{}(lhs.get(), rhs.get())))
-    -> decltype(std::greater_equal<>{}(lhs.get(), rhs.get()))
-{
-    return std::greater_equal<>{}(lhs.get(), rhs.get());
-}
-
-// more unwanted operators
-template <class T, class U>
-std::ptrdiff_t operator-(const not_null<T>&, const not_null<U>&) = delete;
-template <class T>
-not_null<T> operator-(const not_null<T>&, std::ptrdiff_t) = delete;
-template <class T>
-not_null<T> operator+(const not_null<T>&, std::ptrdiff_t) = delete;
-template <class T>
-not_null<T> operator+(std::ptrdiff_t, const not_null<T>&) = delete;
-
-// T is conceptually a pointer so we don't have to worry about it being a reference and violating
-// std::hash requirements
-template <class T, class U = typename T::element_type,
-          bool = std::is_default_constructible<std::hash<U>>::value>
-struct not_null_hash
-{
-    std::size_t operator()(const T& value) const noexcept { return std::hash<U>{}(value.get()); }
-};
-
-template <class T, class U>
-struct not_null_hash<T, U, false>
-{
-    not_null_hash() = delete;
-    not_null_hash(const not_null_hash&) = delete;
-    not_null_hash& operator=(const not_null_hash&) = delete;
-};
-
-} // namespace gsl_detail
-
-namespace std
-{
-template <class T>
-struct hash<gsl_detail::not_null<T>> : gsl_detail::not_null_hash<gsl_detail::not_null<T>>
-{
-};
-
-} // namespace std
-
-namespace gsl_detail
-{
-
-//
-// strict_not_null
-//
-// Restricts a pointer or smart pointer to only hold non-null values,
-//
-// - provides a strict (i.e. explicit constructor from T) wrapper of not_null
-// - to be used for new code that wishes the design to be cleaner and make not_null
-//   checks intentional, or in old code that would like to make the transition.
-//
-//   To make the transition from not_null, incrementally replace not_null
-//   by strict_not_null and fix compilation errors
-//
-//   Expect to
-//   - remove all unneeded conversions from raw pointer to not_null and back
-//   - make API clear by specifying not_null in parameters where needed
-//   - remove unnecessary asserts
-//
-template <class T>
-class strict_not_null : public not_null<T>
-{
-public:
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr explicit strict_not_null(U&& u) noexcept(std::is_nothrow_move_constructible<T>::value)
-        : not_null<T>(std::forward<U>(u))
-    {}
-
-    template <typename = std::enable_if_t<!std::is_same<std::nullptr_t, T>::value>>
-    constexpr explicit strict_not_null(T u) noexcept(std::is_nothrow_move_constructible<T>::value)
-        : not_null<T>(std::move(u))
-    {}
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr strict_not_null(const strict_not_null<U>& other) noexcept(
-        std::is_nothrow_move_constructible<T>::value)
-        : not_null<T>(other)
-    {}
-
-    template <typename U, typename = std::enable_if_t<std::is_convertible<U, T>::value>>
-    constexpr strict_not_null(strict_not_null<U>&& other) noexcept(std::is_nothrow_move_constructible<T>::value) : not_null<T>(std::move(other))
-    {}
-
-    constexpr strict_not_null(strict_not_null&& other) = default;
-    constexpr strict_not_null& operator=(strict_not_null&& other) = default;
-    constexpr strict_not_null(const strict_not_null& other) = default;
-    constexpr strict_not_null& operator=(const strict_not_null& other) = default;
-
-    // prevents compilation when someone attempts to assign a null pointer constant
-    strict_not_null(std::nullptr_t) = delete;
-    strict_not_null& operator=(std::nullptr_t) = delete;
-
-    // unwanted operators...pointers only point to single objects!
-    strict_not_null& operator++() = delete;
-    strict_not_null& operator--() = delete;
-    strict_not_null operator++(int) = delete;
-    strict_not_null operator--(int) = delete;
-    strict_not_null& operator+=(std::ptrdiff_t) = delete;
-    strict_not_null& operator-=(std::ptrdiff_t) = delete;
-    void operator[](std::ptrdiff_t) const = delete;
-};
-
-// more unwanted operators
-template <class T, class U>
-std::ptrdiff_t operator-(const strict_not_null<T>&, const strict_not_null<U>&) = delete;
-template <class T>
-strict_not_null<T> operator-(const strict_not_null<T>&, std::ptrdiff_t) = delete;
-template <class T>
-strict_not_null<T> operator+(const strict_not_null<T>&, std::ptrdiff_t) = delete;
-template <class T>
-strict_not_null<T> operator+(std::ptrdiff_t, const strict_not_null<T>&) = delete;
-
-template <class T>
-auto make_strict_not_null(T&& t) noexcept
-{
-    return strict_not_null<std::remove_cv_t<std::remove_reference_t<T>>>{std::forward<T>(t)};
-}
-
-#if (defined(__cpp_deduction_guides) && (__cpp_deduction_guides >= 201611L))
-
-// deduction guides to prevent the ctad-maybe-unsupported warning
-template <class T>
-not_null(T) -> not_null<T>;
-template <class T>
-strict_not_null(T) -> strict_not_null<T>;
-
-#endif // ( defined(__cpp_deduction_guides) && (__cpp_deduction_guides >= 201611L) )
-
-} // namespace gsl_detail
-
-namespace std
-{
-template <class T>
-struct hash<gsl_detail::strict_not_null<T>> : gsl_detail::not_null_hash<gsl_detail::strict_not_null<T>>
-{
-};
-
-} // namespace std
+#include <compare>
+#include <concepts>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
 
 namespace util {
 
@@ -398,11 +34,67 @@ namespace util {
 /// move. Clang-tidy is used to enforce use-after-move violations, so that the
 /// null can never be observed.
 template <class T>
-struct NotNull : public gsl_detail::strict_not_null<T> {
-    using gsl_detail::strict_not_null<T>::strict_not_null;
+    requires requires(T t) { { t != nullptr } -> std::convertible_to<bool>; }
+class NotNull
+{
+public:
+    template <std::convertible_to<T> U>
+    constexpr explicit NotNull(U&& u) noexcept(std::is_nothrow_constructible_v<T, U&&>)
+        : m_ptr(std::forward<U>(u))
+    {
+        Assert(m_ptr != nullptr);
+    }
+
+    template <std::convertible_to<T> U>
+    constexpr NotNull(NotNull<U>&& other) noexcept(std::is_nothrow_constructible_v<T, U&&>)
+        : m_ptr(std::move(other).get())
+    {}
+
+    template <std::convertible_to<T> U>
+    constexpr NotNull(const NotNull<U>& other) noexcept(std::is_nothrow_constructible_v<T, const U&>)
+        : m_ptr(other.get())
+    {}
+
+    constexpr NotNull(NotNull&&) = default;
+    constexpr NotNull& operator=(NotNull&&) = default;
+    constexpr NotNull(const NotNull&) = default;
+    constexpr NotNull& operator=(const NotNull&) = default;
+
+    constexpr const T& get() const& noexcept { return m_ptr; }
+    constexpr T&& get() && noexcept { return std::move(m_ptr); }
+
+    constexpr decltype(auto) operator->() const { return get(); }
+    constexpr decltype(auto) operator*() const { return *get(); }
+
+    constexpr operator T() const& { return get(); }
+    constexpr operator T() && noexcept { return std::move(*this).get(); }
+
+    NotNull(std::nullptr_t) = delete;
+    NotNull& operator=(std::nullptr_t) = delete;
+
+    void swap(NotNull& other) noexcept { std::swap(m_ptr, other.m_ptr); }
+
+private:
+    T m_ptr;
 };
-template <typename T>
+
+template <class T>
 NotNull(T) -> NotNull<T>;
+
+template <class T>
+void swap(NotNull<T>& a, NotNull<T>& b) noexcept { a.swap(b); }
+
+template <class T, class U>
+constexpr auto operator<=>(const NotNull<T>& a, const NotNull<U>& b)
+{
+    return std::compare_three_way{}(a.get(), b.get());
+}
+
+template <class T, class U>
+constexpr bool operator==(const NotNull<T>& a, const NotNull<U>& b)
+{
+    return a.get() == b.get();
+}
 
 template <typename T, typename Deleter = std::default_delete<T>>
 using NotNullUniquePtr = NotNull<std::unique_ptr<T, Deleter>>;
@@ -412,13 +104,12 @@ using NotNullSharedPtr = NotNull<std::shared_ptr<T>>;
 
 } // namespace util
 
-namespace std
-{
 template <class T>
-struct hash<util::NotNull<T>> : gsl_detail::not_null_hash<util::NotNull<T>>
-{
+struct std::hash<util::NotNull<T>> {
+    std::size_t operator()(const util::NotNull<T>& v) const noexcept
+    {
+        return std::hash<T>{}(v.get());
+    }
 };
-
-} // namespace std
 
 #endif // BITCOIN_UTIL_POINTERS_H
