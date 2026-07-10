@@ -25,7 +25,7 @@ namespace util {
 ///
 /// util::NotNull p{std::make_shared<Thing>()};
 ///
-/// NotNull should *not* be used to denote a raw pointer can not be nullptr.
+/// NotNull can *not* be used to denote a raw pointer can not be nullptr.
 /// The C++ language provides raw references for this use case, and the C++
 /// standard library provides std::reference_wrapper, where raw references can
 /// not be used.
@@ -34,7 +34,7 @@ namespace util {
 /// move. Clang-tidy is used to enforce use-after-move violations, so that the
 /// null can never be observed.
 template <class T>
-    requires requires(T t) { { t != nullptr } -> std::convertible_to<bool>; }
+    requires (!std::is_pointer_v<T>) && requires(T t) { { t != nullptr } -> std::convertible_to<bool>; }
 class NotNull
 {
 public:

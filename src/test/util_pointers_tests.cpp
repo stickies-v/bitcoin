@@ -32,6 +32,7 @@ BOOST_AUTO_TEST_CASE(check_nullptr)
 
     static_assert(NotNullConstructible<SomePtr>);
     static_assert(!NotNullConstructible<NullPtr>);
+    static_assert(!NotNullConstructible<int*>);
 }
 
 BOOST_AUTO_TEST_CASE(check_nocopy_ptr)
@@ -65,16 +66,10 @@ BOOST_AUTO_TEST_CASE(check_nocopy_ptr)
 BOOST_AUTO_TEST_CASE(check_derived)
 {
     struct MyBase {
+        virtual ~MyBase() = default;
     };
     struct MyDerived : public MyBase {
     };
-
-    MyBase base;
-    MyDerived derived;
-    util::NotNull<MyDerived*> p{&derived};
-    util::NotNull<MyBase*> q(&base);
-    q = p;
-    BOOST_CHECK_EQUAL(q, p);
 
     util::NotNull nn_derived{std::make_unique<MyDerived>()};
     util::NotNull nn_base{std::make_unique<MyBase>()};
@@ -105,36 +100,38 @@ BOOST_AUTO_TEST_CASE(check_swap)
 
 BOOST_AUTO_TEST_CASE(check_deref)
 {
-    int v{2};
-    util::NotNull p(&v);
+    util::NotNull p{std::make_unique<int>(2)};
     *p = 3;
-    BOOST_CHECK_EQUAL(v, 3);
+    BOOST_CHECK_EQUAL(*p, 3);
     *p.get() = 4;
-    BOOST_CHECK_EQUAL(v, 4);
-    util::NotNull<const int*> c{&v};
-    v = 5;
-    BOOST_CHECK_EQUAL(*c, 5);
+    BOOST_CHECK_EQUAL(*p, 4);
 }
 
 BOOST_AUTO_TEST_CASE(check_compare_set)
 {
-    int a;
-    int b;
-    std::set<util::NotNull<int*>> uniq{};
-    uniq.emplace(&a);
-    uniq.emplace(&a);
-    uniq.emplace(&b);
+    auto a{std::make_shared<int>(1)};
+    auto b{std::make_shared<int>(2)};
+    util::NotNull na{a};
+    util::NotNull na_dup{a};
+    util::NotNull nb{b};
+    std::set<util::NotNullSharedPtr<int>> uniq{};
+    uniq.insert(na);
+    uniq.insert(na_dup);
+    uniq.insert(nb);
     BOOST_CHECK_EQUAL(uniq.size(), 2);
 }
 
 BOOST_AUTO_TEST_CASE(check_hash_set)
 {
-    int a;
-    int b;
-    std::unordered_set<util::NotNull<int*>> uniq{};
-    uniq.emplace(&a);
-    uniq.emplace(&a);
-    uniq.emplace(&b);
+    auto a{std::make_shared<int>(1)};
+    auto b{std::make_shared<int>(2)};
+    util::NotNull na{a};
+    util::NotNull na_dup{a};
+    util::NotNull nb{b};
+    std::unordered_set<util::NotNullSharedPtr<int>> uniq{};
+    uniq.insert(na);
+    uniq.insert(na_dup);
+    uniq.insert(nb);
     BOOST_CHECK_EQUAL(uniq.size(), 2);
 }
 
