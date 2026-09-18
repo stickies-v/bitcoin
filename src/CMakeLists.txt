@@ -144,16 +144,20 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/sign.cpp
   script/signingprovider.cpp
   script/solver.cpp
+  util/bip32.cpp
+  util/fees.cpp
 )
 target_link_libraries(bitcoin_common
   PRIVATE
     core_interface
     bitcoin_consensus
+    bitcoin_net
     bitcoin_util
     univalue
     secp256k1
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
     $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
 )
 
 include(InstallBinaryComponent)
@@ -286,6 +290,8 @@ target_link_libraries(bitcoin_node
   PRIVATE
     core_interface
     bitcoin_common
+    bitcoin_net
+    bitcoin_system
     bitcoin_util
     $<TARGET_NAME_IF_EXISTS:bitcoin_zmq>
     leveldb
@@ -309,7 +315,7 @@ if(BUILD_BITCOIN_BIN)
     bitcoin-res.rc
   )
   add_windows_application_manifest(bitcoin)
-  target_link_libraries(bitcoin core_interface bitcoin_common bitcoin_util)
+  target_link_libraries(bitcoin core_interface bitcoin_common bitcoin_system bitcoin_util)
   install_binary_component(bitcoin HAS_MANPAGE)
 endif()
 
@@ -367,6 +373,7 @@ if(BUILD_CLI)
     bitcoin_cli
     bitcoin_common
     bitcoin_ipc
+    bitcoin_net
     bitcoin_util
   )
   install_binary_component(bitcoin-cli HAS_MANPAGE)
