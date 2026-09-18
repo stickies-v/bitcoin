@@ -77,6 +77,7 @@ add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   script/interpreter.cpp
   script/script.cpp
   script/script_error.cpp
+  script/solver.cpp
   uint256.cpp
 )
 target_link_libraries(bitcoin_consensus
@@ -84,6 +85,96 @@ target_link_libraries(bitcoin_consensus
     core_interface
     bitcoin_crypto
     secp256k1
+)
+
+# The model of a chain: per-network consensus parameters and deployments,
+# proof of work, the block index and the UTXO view. Types and rules about
+# chain state, without processing or persistence.
+add_library(bitcoin_chain STATIC EXCLUDE_FROM_ALL
+  chain.cpp
+  coins.cpp
+  compressor.cpp
+  deploymentinfo.cpp
+  kernel/chainparams.cpp
+  pow.cpp
+)
+target_link_libraries(bitcoin_chain
+  PRIVATE
+    core_interface
+    bitcoin_consensus
+    bitcoin_util
+)
+
+# Transaction standardness rules that need no mempool state: fee rates,
+# dust, virtual size, package shape.
+add_library(bitcoin_policy STATIC EXCLUDE_FROM_ALL
+  policy/feerate.cpp
+  policy/packages.cpp
+  policy/policy.cpp
+  policy/settings.cpp
+)
+target_link_libraries(bitcoin_policy
+  PRIVATE
+    core_interface
+    bitcoin_chain
+    bitcoin_consensus
+    bitcoin_util
+)
+
+# The validation engine: applies consensus and policy rules to chain state
+# and persists the result. Chainstate, block storage, transaction database,
+# mempool, validation notifications.
+add_library(bitcoin_validation STATIC EXCLUDE_FROM_ALL
+  consensus/tx_verify.cpp
+  dbwrapper.cpp
+  deploymentstatus.cpp
+  flatfile.cpp
+  kernel/chain.cpp
+  kernel/checks.cpp
+  kernel/coinstats.cpp
+  kernel/context.cpp
+  kernel/cs_main.cpp
+  kernel/disconnected_transactions.cpp
+  kernel/mempool_removal_reason.cpp
+  node/blockstorage.cpp
+  node/chainstate.cpp
+  node/utxo_snapshot.cpp
+  policy/ephemeral_policy.cpp
+  policy/rbf.cpp
+  policy/truc_policy.cpp
+  script/sigcache.cpp
+  signet.cpp
+  txdb.cpp
+  txgraph.cpp
+  txmempool.cpp
+  validation.cpp
+  validationinterface.cpp
+  versionbits.cpp
+)
+target_link_libraries(bitcoin_validation
+  PRIVATE
+    core_interface
+    bitcoin_chain
+    bitcoin_consensus
+    bitcoin_policy
+    bitcoin_util
+    leveldb
+    $<TARGET_NAME_IF_EXISTS:Boost::headers>
+    $<TARGET_NAME_IF_EXISTS:USDT::headers>
+)
+
+# The set of libraries that make up the consensus engine. Compiles nothing.
+# kernel/CMakeLists.txt builds libbitcoinkernel from the sources of these
+# libraries.
+add_library(bitcoin_kernel INTERFACE)
+target_link_libraries(bitcoin_kernel
+  INTERFACE
+    bitcoin_validation
+    bitcoin_policy
+    bitcoin_chain
+    bitcoin_consensus
+    bitcoin_util
+    bitcoin_crypto
 )
 
 if(WITH_ZMQ)
@@ -96,10 +187,8 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   addresstype.cpp
   base58.cpp
   bech32.cpp
-  chain.cpp
   chainparams.cpp
   chainparamsbase.cpp
-  coins.cpp
   common/args.cpp
   common/bloom.cpp
   common/config.cpp
@@ -114,12 +203,9 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/signmessage.cpp
   common/system.cpp
   common/url.cpp
-  compressor.cpp
   core_io.cpp
-  deploymentinfo.cpp
   external_signer.cpp
   init/common.cpp
-  kernel/chainparams.cpp
   key.cpp
   key_io.cpp
   merkleblock.cpp
@@ -129,9 +215,6 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   netaddress.cpp
   netbase.cpp
   outputtype.cpp
-  policy/feerate.cpp
-  policy/policy.cpp
-  pow.cpp
   protocol.cpp
   psbt.cpp
   rpc/rawtransaction_util.cpp
@@ -143,13 +226,13 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/parsing.cpp
   script/sign.cpp
   script/signingprovider.cpp
-  script/solver.cpp
   util/bip32.cpp
   util/fees.cpp
 )
 target_link_libraries(bitcoin_common
   PRIVATE
     core_interface
+    bitcoin_chain
     bitcoin_consensus
     bitcoin_net
     bitcoin_util
@@ -192,10 +275,6 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   bip324.cpp
   blockencodings.cpp
   blockfilter.cpp
-  consensus/tx_verify.cpp
-  dbwrapper.cpp
-  deploymentstatus.cpp
-  flatfile.cpp
   headerssync.cpp
   httprpc.cpp
   httpserver.cpp
@@ -206,22 +285,13 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   index/txindex.cpp
   index/txospenderindex.cpp
   init.cpp
-  kernel/chain.cpp
-  kernel/checks.cpp
-  kernel/coinstats.cpp
-  kernel/context.cpp
-  kernel/cs_main.cpp
-  kernel/disconnected_transactions.cpp
-  kernel/mempool_removal_reason.cpp
   mapport.cpp
   net.cpp
   net_processing.cpp
   netgroup.cpp
   node/abort.cpp
   node/blockmanager_args.cpp
-  node/blockstorage.cpp
   node/caches.cpp
-  node/chainstate.cpp
   node/chainstatemanager_args.cpp
   node/coin.cpp
   node/coins_view_args.cpp
@@ -246,18 +316,12 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   node/txdownloadman_impl.cpp
   node/txorphanage.cpp
   node/txreconciliation.cpp
-  node/utxo_snapshot.cpp
   node/warnings.cpp
   noui.cpp
-  policy/ephemeral_policy.cpp
   policy/fees/block_policy_estimator.cpp
   policy/fees/estimator_args.cpp
   policy/fees/estimator_man.cpp
   policy/fees/mempool_estimator.cpp
-  policy/packages.cpp
-  policy/rbf.cpp
-  policy/settings.cpp
-  policy/truc_policy.cpp
   private_broadcast.cpp
   rest.cpp
   rpc/blockchain.cpp
@@ -273,16 +337,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   rpc/server_util.cpp
   rpc/signmessage.cpp
   rpc/txoutproof.cpp
-  script/sigcache.cpp
-  signet.cpp
   torcontrol.cpp
-  txdb.cpp
-  txgraph.cpp
-  txmempool.cpp
   txrequest.cpp
-  validation.cpp
-  validationinterface.cpp
-  versionbits.cpp
   $<$<TARGET_EXISTS:bitcoin_wallet>:wallet/init.cpp>
   $<$<NOT:$<TARGET_EXISTS:bitcoin_wallet>>:dummywallet.cpp>
 )
@@ -290,11 +346,10 @@ target_link_libraries(bitcoin_node
   PRIVATE
     core_interface
     bitcoin_common
+    bitcoin_kernel
     bitcoin_net
     bitcoin_system
-    bitcoin_util
     $<TARGET_NAME_IF_EXISTS:bitcoin_zmq>
-    leveldb
     minisketch
     univalue
     $<TARGET_NAME_IF_EXISTS:Boost::headers>

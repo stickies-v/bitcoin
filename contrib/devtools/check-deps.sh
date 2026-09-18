@@ -5,21 +5,28 @@ set -Eeuo pipefail
 
 # Declare paths to libraries
 declare -A LIBS
+LIBS[chain]="libbitcoin_chain.a"
 LIBS[cli]="libbitcoin_cli.a"
 LIBS[common]="libbitcoin_common.a"
 LIBS[consensus]="libbitcoin_consensus.a"
 LIBS[crypto]="libbitcoin_crypto.a"
 LIBS[net]="libbitcoin_net.a"
 LIBS[node]="libbitcoin_node.a"
+LIBS[policy]="libbitcoin_policy.a"
 LIBS[system]="libbitcoin_system.a"
 LIBS[util]="libbitcoin_util.a"
+LIBS[validation]="libbitcoin_validation.a"
 LIBS[wallet]="libbitcoin_wallet.a"
 
 # Declare allowed dependencies "X Y" where X is allowed to depend on Y. This
 # list is taken from doc/design/libraries.md.
 ALLOWED_DEPENDENCIES=(
+    "chain consensus"
+    "chain crypto"
+    "chain util"
     "cli common"
     "cli util"
+    "common chain"
     "common consensus"
     "common crypto"
     "common net"
@@ -27,16 +34,28 @@ ALLOWED_DEPENDENCIES=(
     "consensus crypto"
     "net crypto"
     "net util"
+    "node chain"
     "node common"
     "node consensus"
     "node crypto"
-    "node kernel"
     "node net"
+    "node policy"
     "node system"
     "node util"
+    "node validation"
+    "policy chain"
+    "policy consensus"
+    "policy crypto"
+    "policy util"
     "util crypto"
+    "validation chain"
+    "validation consensus"
+    "validation crypto"
+    "validation policy"
+    "validation util"
     "wallet common"
     "wallet crypto"
+    "wallet policy"
     "wallet util"
 )
 

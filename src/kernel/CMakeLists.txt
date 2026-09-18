@@ -4,85 +4,44 @@
 
 include(GNUInstallDirs)
 
-# TODO: libbitcoinkernel is a work in progress consensus engine
-#       library, as more and more modules are decoupled from the
-#       consensus engine, this list will shrink to only those
-#       which are absolutely necessary.
+# libbitcoinkernel is built from the source lists of the libraries in
+# `bitcoin_kernel`, so the external and internal builds cannot use
+# different sources. The sources are compiled again rather than linked
+# from the static archives, so that this target can use its own symbol
+# visibility and compile options.
 add_library(bitcoinkernel
   bitcoinkernel.cpp
-  chain.cpp
-  checks.cpp
-  chainparams.cpp
-  coinstats.cpp
-  context.cpp
-  cs_main.cpp
-  disconnected_transactions.cpp
-  mempool_removal_reason.cpp
-  ../arith_uint256.cpp
-  ../chain.cpp
-  ../coins.cpp
-  ../compressor.cpp
-  ../consensus/merkle.cpp
-  ../consensus/tx_check.cpp
-  ../consensus/tx_verify.cpp
-  ../dbwrapper.cpp
-  ../deploymentinfo.cpp
-  ../deploymentstatus.cpp
-  ../flatfile.cpp
-  ../hash.cpp
-  ../logging.cpp
-  ../node/blockstorage.cpp
-  ../node/chainstate.cpp
-  ../node/utxo_snapshot.cpp
-  ../policy/ephemeral_policy.cpp
-  ../policy/feerate.cpp
-  ../policy/packages.cpp
-  ../policy/policy.cpp
-  ../policy/rbf.cpp
-  ../policy/settings.cpp
-  ../policy/truc_policy.cpp
-  ../pow.cpp
-  ../primitives/block.cpp
-  ../primitives/transaction.cpp
-  ../pubkey.cpp
-  ../random.cpp
-  ../randomenv.cpp
-  ../script/interpreter.cpp
-  ../script/script.cpp
-  ../script/script_error.cpp
-  ../script/sigcache.cpp
-  ../script/solver.cpp
-  ../signet.cpp
-  ../streams.cpp
-  ../sync.cpp
-  ../txdb.cpp
-  ../txgraph.cpp
-  ../txmempool.cpp
-  ../uint256.cpp
-  ../util/chaintype.cpp
-  ../util/check.cpp
-  ../util/exception.cpp
-  ../util/expected.cpp
-  ../util/feefrac.cpp
-  ../util/fs.cpp
-  ../util/fs_helpers.cpp
-  ../util/hasher.cpp
-  ../util/moneystr.cpp
-  ../util/rbf.cpp
-  ../util/signalinterrupt.cpp
-  ../util/syserror.cpp
-  ../util/thread.cpp
-  ../util/threadnames.cpp
-  ../util/time.cpp
-  ../util/tokenpipe.cpp
-  ../validation.cpp
-  ../validationinterface.cpp
-  ../versionbits.cpp
   $<TARGET_OBJECTS:bitcoin_clientversion>
   $<TARGET_OBJECTS:bitcoin_crypto>
   $<TARGET_OBJECTS:leveldb>
   $<TARGET_OBJECTS:crc32c>
 )
+
+function(add_sources_of_library target library)
+  get_target_property(sources ${library} SOURCES)
+  get_target_property(source_dir ${library} SOURCE_DIR)
+  foreach(source IN LISTS sources)
+    if(source MATCHES "^\\$<")
+      message(FATAL_ERROR "${library} has a generator expression in its sources, which ${target} cannot compile from: ${source}")
+    endif()
+    cmake_path(ABSOLUTE_PATH source BASE_DIRECTORY "${source_dir}" NORMALIZE)
+    target_sources(${target} PRIVATE "${source}")
+  endforeach()
+endfunction()
+
+# `bitcoin_kernel` must list plain target names, added from the directory
+# that defines it. Entries added from another directory or through
+# generator expressions are not target names and cannot be resolved here.
+get_target_property(kernel_libraries bitcoin_kernel INTERFACE_LINK_LIBRARIES)
+foreach(library IN LISTS kernel_libraries)
+  if(NOT TARGET "${library}")
+    message(FATAL_ERROR "bitcoin_kernel entry is not a target: ${library}")
+  endif()
+  # bitcoin_crypto has per-file compile options, so its objects are reused above.
+  if(NOT library STREQUAL "bitcoin_crypto")
+    add_sources_of_library(bitcoinkernel ${library})
+  endif()
+endforeach()
 
 # Compiler warnings that apply only to the kernel and its dependencies.
 # These can be more strict and/or warnings that only apply to shared
@@ -105,7 +64,7 @@ target_link_libraries(bitcoinkernel
     secp256k1_objs
     $<$<PLATFORM_ID:Windows>:bcrypt>
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
-    Boost::headers
+    $<TARGET_NAME_IF_EXISTS:Boost::headers>
 )
 
 target_include_directories(bitcoinkernel PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/include>)

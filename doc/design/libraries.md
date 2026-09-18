@@ -2,24 +2,29 @@
 
 | Name                     | Description |
 |--------------------------|-------------|
+| *libbitcoin_chain*       | The model of a chain: per-network consensus parameters, proof of work, the block index and the UTXO view. No processing, no persistence. |
 | *libbitcoin_cli*         | RPC client functionality used by *bitcoin-cli* executable |
 | *libbitcoin_common*      | Home for common functionality shared by different executables and libraries. Similar to *libbitcoin_util*, but higher-level (see [Dependencies](#dependencies)). |
-| *libbitcoin_consensus*   | Consensus functionality used by *libbitcoin_node* and *libbitcoin_wallet*. |
+| *libbitcoin_consensus*   | Consensus rules: primitives, script interpreter, script templates and transaction checks. |
 | *libbitcoin_crypto*      | Hardware-optimized functions for data encryption, hashing, message authentication, and key derivation. |
-| *libbitcoin_kernel*      | Consensus engine and support library used for validation by *libbitcoin_node*. |
+| *libbitcoinkernel*       | External consensus engine library with a C interface, built from the sources of the libraries in the `bitcoin_kernel` CMake target. |
 | *libbitcoinqt*           | GUI functionality used by *bitcoin-qt* and *bitcoin-gui* executables. |
 | *libbitcoin_ipc*         | IPC functionality used by *bitcoin-node* and *bitcoin-gui* executables to communicate when [`-DENABLE_IPC=ON`](multiprocess.md) is used. |
 | *libbitcoin_net*         | Networking primitives: sockets and network address handling. |
 | *libbitcoin_node*        | P2P and RPC server functionality used by *bitcoind* and *bitcoin-qt* executables. |
+| *libbitcoin_policy*      | Transaction standardness rules that need no mempool state: fee rates, dust, virtual size, package shape. |
 | *libbitcoin_system*      | Operating system services beyond the C++ standard library. |
 | *libbitcoin_util*        | Generic helpers built on the C++ standard library. Similar to *libbitcoin_common*, but lower-level (see [Dependencies](#dependencies)). |
+| *libbitcoin_validation*  | The validation engine: chainstate, block storage, transaction database, mempool, validation notifications. |
 | *libbitcoin_wallet*      | Wallet functionality used by *bitcoind* and *bitcoin-wallet* executables. |
 | *libbitcoin_wallet_tool* | Lower-level wallet functionality used by *bitcoin-wallet* executable. |
 | *libbitcoin_zmq*         | [ZeroMQ](../zmq.md) functionality used by *bitcoind* and *bitcoin-qt* executables. |
 
 ## Conventions
 
-- Most libraries are internal libraries and have APIs which are completely unstable! There are few or no restrictions on backwards compatibility or rules about external dependencies. An exception is *libbitcoin_kernel*, which, at some future point, will have a documented external interface.
+- Most libraries are internal libraries and have APIs which are completely unstable! There are few or no restrictions on backwards compatibility or rules about external dependencies. An exception is *libbitcoinkernel*, which has a documented external interface in [`src/kernel/bitcoinkernel.h`](../../src/kernel/bitcoinkernel.h).
+
+- A library is defined by what its code does, not by which executable uses it. When several consumers need only part of a library, that is a signal to split the library, not to move code toward a consumer.
 
 - Generally each library should have a corresponding source directory and namespace. Source code organization is a work in progress, so it is true that some namespaces are applied inconsistently, and if you look at [`add_library(bitcoin_* ...)`](../../src/CMakeLists.txt) lists you can see that many libraries pull in files from outside their source directory. But when working with libraries, it is good to follow a consistent pattern like:
 
@@ -53,49 +58,66 @@ bitcoin-qt[bitcoin-qt]-->libbitcoin_wallet;
 bitcoin-wallet[bitcoin-wallet]-->libbitcoin_wallet;
 bitcoin-wallet[bitcoin-wallet]-->libbitcoin_wallet_tool;
 
+libbitcoinkernel[libbitcoinkernel]-->libbitcoin_validation;
+
+libbitcoin_chain-->libbitcoin_consensus;
+libbitcoin_chain-->libbitcoin_crypto;
+libbitcoin_chain-->libbitcoin_util;
+
 libbitcoin_cli-->libbitcoin_util;
 libbitcoin_cli-->libbitcoin_common;
 
 libbitcoin_consensus-->libbitcoin_crypto;
 
+libbitcoin_common-->libbitcoin_chain;
 libbitcoin_common-->libbitcoin_consensus;
 libbitcoin_common-->libbitcoin_crypto;
 libbitcoin_common-->libbitcoin_net;
 libbitcoin_common-->libbitcoin_util;
 
-libbitcoin_kernel-->libbitcoin_consensus;
-libbitcoin_kernel-->libbitcoin_crypto;
-libbitcoin_kernel-->libbitcoin_util;
-
 libbitcoin_net-->libbitcoin_crypto;
 libbitcoin_net-->libbitcoin_util;
 
+libbitcoin_node-->libbitcoin_chain;
+libbitcoin_node-->libbitcoin_common;
 libbitcoin_node-->libbitcoin_consensus;
 libbitcoin_node-->libbitcoin_crypto;
-libbitcoin_node-->libbitcoin_kernel;
-libbitcoin_node-->libbitcoin_common;
 libbitcoin_node-->libbitcoin_net;
+libbitcoin_node-->libbitcoin_policy;
 libbitcoin_node-->libbitcoin_system;
 libbitcoin_node-->libbitcoin_util;
+libbitcoin_node-->libbitcoin_validation;
+
+libbitcoin_policy-->libbitcoin_chain;
+libbitcoin_policy-->libbitcoin_consensus;
+libbitcoin_policy-->libbitcoin_crypto;
+libbitcoin_policy-->libbitcoin_util;
 
 libbitcoinqt-->libbitcoin_common;
 libbitcoinqt-->libbitcoin_util;
 
 libbitcoin_util-->libbitcoin_crypto;
 
+libbitcoin_validation-->libbitcoin_chain;
+libbitcoin_validation-->libbitcoin_consensus;
+libbitcoin_validation-->libbitcoin_crypto;
+libbitcoin_validation-->libbitcoin_policy;
+libbitcoin_validation-->libbitcoin_util;
+
 libbitcoin_wallet-->libbitcoin_common;
 libbitcoin_wallet-->libbitcoin_crypto;
+libbitcoin_wallet-->libbitcoin_policy;
 libbitcoin_wallet-->libbitcoin_util;
 
 libbitcoin_wallet_tool-->libbitcoin_wallet;
 libbitcoin_wallet_tool-->libbitcoin_util;
 
 classDef bold stroke-width:2px, font-weight:bold, font-size: smaller;
-class bitcoin-qt,bitcoind,bitcoin-cli,bitcoin-wallet bold
+class bitcoin-qt,bitcoind,bitcoin-cli,bitcoin-wallet,libbitcoinkernel bold
 ```
 </td></tr><tr><td>
 
-**Dependency graph**. Arrows show linker symbol dependencies. *Crypto* lib depends on nothing. *Util* lib is depended on by everything. *Kernel* lib depends only on consensus, crypto, and util.
+**Dependency graph**. Arrows show linker symbol dependencies. *Crypto* lib depends on nothing. *Util* lib is depended on by everything. *Validation* lib is used only by *libbitcoin_node* and by the external *libbitcoinkernel*, which is compiled from the sources of *validation* and everything below it.
 
 </td></tr></table>
 
@@ -109,14 +131,20 @@ class bitcoin-qt,bitcoind,bitcoin-cli,bitcoin-wallet bold
 
 - *libbitcoin_net* should only depend on *libbitcoin_util* and *libbitcoin_crypto*, and *libbitcoin_system* should depend on nothing. Most operating system wrappers still live in *libbitcoin_util* and move to *libbitcoin_system* over time.
 
-- *libbitcoin_common* is a home for miscellaneous shared code used by different Bitcoin Core applications. It should not depend on anything other than *libbitcoin_util*, *libbitcoin_consensus*, and *libbitcoin_crypto*.
+- *libbitcoin_chain* should only depend on *libbitcoin_consensus*, *libbitcoin_util*, and *libbitcoin_crypto*. The block index and the UTXO view are here rather than in *libbitcoin_validation* because proof of work takes a `CBlockIndex` and standardness checks take a `CCoinsViewCache`.
 
-- *libbitcoin_kernel* should only depend on *libbitcoin_util*, *libbitcoin_consensus*, and *libbitcoin_crypto*.
+- *libbitcoin_policy* should only depend on *libbitcoin_chain*, *libbitcoin_consensus*, *libbitcoin_util*, and *libbitcoin_crypto*. Standardness rules that read the mempool stay in *libbitcoin_validation*.
 
-- The only thing that should depend on *libbitcoin_kernel* internally should be *libbitcoin_node*. GUI and wallet libraries *libbitcoinqt* and *libbitcoin_wallet* in particular should not depend on *libbitcoin_kernel* and the unneeded functionality it would pull in, like block validation. To the extent that GUI and wallet code need scripting and signing functionality, they should be able to get it from *libbitcoin_consensus*, *libbitcoin_common*, *libbitcoin_crypto*, and *libbitcoin_util*, instead of *libbitcoin_kernel*.
+- *libbitcoin_common* is a home for miscellaneous shared code used by different Bitcoin Core applications. It should not depend on anything other than *libbitcoin_chain*, *libbitcoin_util*, *libbitcoin_consensus*, and *libbitcoin_crypto*.
+
+- *libbitcoin_validation* should only depend on *libbitcoin_policy*, *libbitcoin_chain*, *libbitcoin_util*, *libbitcoin_consensus*, and *libbitcoin_crypto*.
+
+- The only thing that should depend on *libbitcoin_validation* internally should be *libbitcoin_node*. GUI and wallet libraries *libbitcoinqt* and *libbitcoin_wallet* in particular should not depend on *libbitcoin_validation* and the unneeded functionality it would pull in, like block validation. To the extent that GUI and wallet code need scripting, policy and signing functionality, they should get it from *libbitcoin_consensus*, *libbitcoin_policy*, *libbitcoin_common*, *libbitcoin_crypto*, and *libbitcoin_util*.
+
+- The CMake interface target `bitcoin_kernel` names the libraries that make up the consensus engine. It compiles nothing. *libbitcoinkernel* is built from the sources of those libraries, so the internal and external builds cannot use different source lists.
 
 - GUI, node, and wallet code internal implementations should all be independent of each other, and the *libbitcoinqt*, *libbitcoin_node*, *libbitcoin_wallet* libraries should never reference each other's symbols. They should only call each other through [`src/interfaces/`](../../src/interfaces/) abstract interfaces.
 
 ## Work in progress
 
-- Validation code is moving from *libbitcoin_node* to *libbitcoin_kernel* as part of [The libbitcoinkernel Project #27587](https://github.com/bitcoin/bitcoin/issues/27587)
+- The mempool is moving out of *libbitcoin_validation* as part of [The libbitcoinkernel Project #27587](https://github.com/bitcoin/bitcoin/issues/27587).

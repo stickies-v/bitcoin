@@ -8,6 +8,7 @@ add_library(bitcoin_util STATIC EXCLUDE_FROM_ALL
   chaintype.cpp
   check.cpp
   exception.cpp
+  expected.cpp
   feefrac.cpp
   fs.cpp
   fs_helpers.cpp
